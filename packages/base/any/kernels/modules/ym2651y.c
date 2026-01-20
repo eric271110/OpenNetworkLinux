@@ -443,7 +443,8 @@ static ssize_t show_ascii(struct device *dev, struct device_attribute *da,
         /* FAN direction for PTT1600's PSU, depends on 
         4th and 3rd bit of return value of 0xC3 command */
         if ((strncmp((data->mfr_model + 1),"PTT1600", strlen("PTT1600")) == 0) ||
-            (strncmp((data->mfr_model + 1),"DPS-650AB-11 C", strlen("DPS-650AB-11 C")) == 0)){
+            (strncmp((data->mfr_model + 1),"DPS-650AB-11 C", strlen("DPS-650AB-11 C")) == 0) ||
+            (strncmp((data->mfr_model + 1),"G1441-0850WNB", strlen("G1441-0850WNB")) == 0)){
             /* Check if 4th bit is '1' and 3rd bit is '0' for "F2B (AFO)" FAN direction */
             if((((data->fan_dir[0] >> 3) & 1) == 0) && (((data->fan_dir[0] >> 4) & 1) == 1)) {
                 strcpy(ptr,"AFO");
