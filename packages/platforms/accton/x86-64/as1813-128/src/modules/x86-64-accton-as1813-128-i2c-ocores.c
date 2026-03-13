@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: GPL-2.0
 /*
  * i2c-ocores.c: I2C bus driver for OpenCores I2C controller
@@ -110,41 +109,55 @@ do {                                                \
     spin_unlock(lock);                              \
 } while (0)
 
-void __iomem    *spi_busy_reg=NULL;
+#define IOREMAP_SIZE                        (0x04)
+static void __iomem    *spi_busy_reg=NULL;
+static void __iomem    *async_reg = NULL;
 EXPORT_SYMBOL(spi_busy_reg);
-int wait_spi(u32 mask, unsigned long timeout) {
-    u32 data;
-    u32 ri = 0;
-    unsigned long j;
+EXPORT_SYMBOL(async_reg);
 
+int wait_spi(u32 mask, u8 times) {
+    u32 data;
+    u32 spi_busy_flag = 0;
+    u8 max_times = 0;
+    max_times = times;
     /* pr_info("CPLD %u, Will time-out at jiffie %lu\n", cpld_id,timeout); */
     if (!spi_busy_reg) {
         return -EFAULT;
     }
 
-    j = jiffies + timeout;
-    while(1) {
+    while(max_times) {
         data = ioread32(spi_busy_reg);
         /* pr_info("@ %u, Read spi_busy_reg: 0x%08x 0x%08x\n", ri, data, mask); */
-        if (!((( data >> 24) & 0xFF) & mask)) {
-            break;
+        if (!((( data >> 24) & 0xFF) & mask))
+        {
+            /* spi flag is normal*/
+            if (spi_busy_flag)
+                break;
+        }
+        else
+        {
+            spi_busy_flag = 1;
         }
 
-        if (time_after(jiffies, j)) {
+        usleep_range(10, 11);
+        max_times--;
+
+        if(max_times == 0)
+        {
+            if(!spi_busy_flag)
+                break;
             if (debug) {
-                pr_warn("@ %u, wait_spi TIMEOUT \n", ri);
-	    }
+                pr_warn("spi_busy_flag %d as max_times is 0 \n", spi_busy_flag);
+            }
             return -ETIMEDOUT;
         }
-
-        ri++;
     }
 
     return 0;
 }
 EXPORT_SYMBOL(wait_spi);
 
-static int wait_cpld(struct ocores_i2c *i2c, unsigned long timeout) {
+static int wait_cpld(struct ocores_i2c *i2c, u8 times) {
     struct platform_device *pdev;
     struct device *dev;
 
@@ -155,7 +168,7 @@ static int wait_cpld(struct ocores_i2c *i2c, unsigned long timeout) {
     /* Get SPI Busy mask from pdev->id */
     dev = i2c->adap.dev.parent;
     pdev = container_of(dev, struct platform_device, dev);
-    wait_spi((pdev->id & 0xFF00) >> 8, timeout);
+    wait_spi((pdev->id & 0xFF00) >> 8, times);
 
     return 0;
 }
@@ -222,13 +235,13 @@ static inline u8 oc_getreg_io_8(struct ocores_i2c *i2c, int reg)
 
 static inline void oc_setreg(struct ocores_i2c *i2c, int reg, u8 value)
 {
-    wait_cpld(i2c, usecs_to_jiffies(20));
+    wait_cpld(i2c, 6);
     i2c->setreg(i2c, reg, value);
 }
 
 static inline u8 oc_getreg(struct ocores_i2c *i2c, int reg)
 {
-    wait_cpld(i2c, usecs_to_jiffies(20));
+    wait_cpld(i2c, 6);
     return i2c->getreg(i2c, reg);
 }
 
@@ -254,7 +267,7 @@ static void ocores_process(struct ocores_i2c *i2c, u8 stat)
     if (stat & OCI2C_STAT_ARBLOST) {
         i2c->state = STATE_ERROR;
         if (debug) {
-            dev_warn(dev, "I2C %s arbitration lost", i2c->adap.name);
+			dev_warn(dev, "I2C %s arbitration lost", i2c->adap.name);
         }
         oc_setreg(i2c, OCI2C_CMD, OCI2C_CMD_STOP);
         goto out;
@@ -268,7 +281,7 @@ static void ocores_process(struct ocores_i2c *i2c, u8 stat)
             i2c->state = STATE_ERROR;
             if (debug) {
                 dev_warn(dev, "I2C %s, no ACK from slave 0x%02x",
-			 i2c->adap.name, msg->addr);
+					 i2c->adap.name, msg->addr);
             }
             oc_setreg(i2c, OCI2C_CMD, OCI2C_CMD_STOP);
             goto out;
@@ -305,7 +318,7 @@ static void ocores_process(struct ocores_i2c *i2c, u8 stat)
     }
 
     if (i2c->state == STATE_READ) {
-        oc_setreg(i2c, OCI2C_CMD, i2c->pos == (msg->len-1) ?
+        oc_setreg(i2c, OCI2C_CMD, i2c->pos == (msg->len - 1) ?
                   OCI2C_CMD_READ_NACK : OCI2C_CMD_READ_ACK);
     } else {
         oc_setreg(i2c, OCI2C_DATA, msg->buf[i2c->pos++]);
@@ -412,8 +425,8 @@ static int ocores_poll_wait(struct ocores_i2c *i2c)
     err = ocores_wait(i2c, OCI2C_STATUS, mask, 0, msecs_to_jiffies(timeout));
     if (err) {
         if (debug) {
-            dev_warn(i2c->adap.dev.parent,
-                     "%s: STATUS timeout, bit 0x%x did not clear in %ums(msecs_to_jiffies(%u)=%lu)\n",
+			dev_warn(i2c->adap.dev.parent,
+				 "%s: STATUS timeout, bit 0x%x did not clear in %ums(msecs_to_jiffies(%u)=%lu)\n",
                      __func__, mask, timeout, timeout, msecs_to_jiffies(timeout));
         }
     }
@@ -462,8 +475,65 @@ static int ocores_xfer_core(struct ocores_i2c *i2c,
 {
     int ret = 0;
     u8 ctrl;
+    int fpga_async_data;
 
     LOCK(&cpld_access_lock);
+
+    struct platform_device *pdev;
+    struct device *dev;
+    int port;
+
+    if (!i2c->adap.dev.parent) {
+        return -EFAULT;
+    }
+
+    /* Get FPGA async mux from pdev->id */
+    dev = i2c->adap.dev.parent;
+    pdev = container_of(dev, struct platform_device, dev);
+    port = (pdev->id & 0x00FF);
+    switch (port)
+    {
+        case 0 ... 15:
+            /* 8'h04: pcie to Mezz_TOP_L */
+            fpga_async_data = 0x04;
+            break;
+        case 16 ... 31:
+            /* 8'h05: pcie to Mezz_TOP_R */
+            fpga_async_data = 0x05;
+            break;
+        case 32 ... 47:
+            /* 8'h00: pcie to MB_CPLD0 */
+            fpga_async_data = 0x00;
+            break;
+        case 48 ... 63:
+            /* 8'h01: pcie to MB_CPLD1 */
+            fpga_async_data = 0x01;
+            break;
+        case 64 ... 79:
+            /* 8'h00: pcie to MB_CPLD0 */
+            fpga_async_data = 0x00;
+            break;
+        case 80 ... 95:
+            /* 8'h01: pcie to MB_CPLD1 */
+            fpga_async_data = 0x01;
+            break;
+        case 96 ... 111:
+            /* 8'h02: pcie to Mezz_BOT_L */
+            fpga_async_data = 0x02;
+            break;
+        case 112 ... 127:
+            /* 8'h03: pcie to Mezz_BOT_R */
+            fpga_async_data = 0x03;
+            break;
+        case 128 ... 129:
+            /* 8'h01: pcie to MB_CPLD1 */
+            fpga_async_data = 0x01;
+            break;
+        default:
+            break;
+    }
+
+    iowrite8(fpga_async_data, async_reg);
 
     ctrl = oc_getreg(i2c, OCI2C_CONTROL);
     if (polling)
@@ -564,7 +634,7 @@ static u32 ocores_func(struct i2c_adapter *adap)
 
 static struct i2c_algorithm ocores_algorithm = {
     .master_xfer = ocores_xfer,
-    //.master_xfer_atomic = ocores_xfer_polling,
+    // .master_xfer_atomic = ocores_xfer_polling,
     .functionality = ocores_func,
 };
 
@@ -755,6 +825,9 @@ static int ocores_i2c_probe(struct platform_device *pdev)
         i2c->reg_io_width = pdata->reg_io_width;
         i2c->ip_clock_khz = pdata->clock_khz;
         dev_info(&pdev->dev, "Write %d KHz, ioWidth:%d, shift:%d", i2c->ip_clock_khz, pdata->reg_io_width ,pdata->reg_shift);
+        // if (pdata->bus_khz)
+        //     i2c->bus_clock_khz = pdata->bus_khz;
+        // else
         i2c->bus_clock_khz = 100;
     } else {
         ret = ocores_i2c_of_probe(pdev, i2c);
@@ -951,7 +1024,7 @@ module_init(ocores_i2c_as1813_128_init);
 module_exit(ocores_i2c_as1813_128_exit);
 #endif
 
-MODULE_AUTHOR("Peter Korsgaard <peter@korsgaard.com>");
+MODULE_AUTHOR("Eric Yang <eric_yang@accton.com>");
 MODULE_DESCRIPTION("OpenCores I2C bus driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:ocores-as1813");
