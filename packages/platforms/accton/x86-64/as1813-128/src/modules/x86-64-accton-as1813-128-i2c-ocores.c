@@ -111,9 +111,9 @@ do {                                                \
 
 #define IOREMAP_SIZE                        (0x04)
 static void __iomem    *spi_busy_reg=NULL;
-static void __iomem    *async_reg = NULL;
+static void __iomem    *spi_mux_reg = NULL;
 EXPORT_SYMBOL(spi_busy_reg);
-EXPORT_SYMBOL(async_reg);
+EXPORT_SYMBOL(spi_mux_reg);
 
 int wait_spi(u32 mask, u8 times) {
     u32 data;
@@ -475,7 +475,7 @@ static int ocores_xfer_core(struct ocores_i2c *i2c,
 {
     int ret = 0;
     u8 ctrl;
-    int fpga_async_data;
+    int fpga_spi_mux_data;
 
     LOCK(&cpld_access_lock);
 
@@ -487,7 +487,7 @@ static int ocores_xfer_core(struct ocores_i2c *i2c,
         return -EFAULT;
     }
 
-    /* Get FPGA async mux from pdev->id */
+    /* Get FPGA spi mux from pdev->id */
     dev = i2c->adap.dev.parent;
     pdev = container_of(dev, struct platform_device, dev);
     port = (pdev->id & 0x00FF);
@@ -495,45 +495,45 @@ static int ocores_xfer_core(struct ocores_i2c *i2c,
     {
         case 0 ... 15:
             /* 8'h04: pcie to Mezz_TOP_L */
-            fpga_async_data = 0x04;
+            fpga_spi_mux_data = 0x04;
             break;
         case 16 ... 31:
             /* 8'h05: pcie to Mezz_TOP_R */
-            fpga_async_data = 0x05;
+            fpga_spi_mux_data = 0x05;
             break;
         case 32 ... 47:
             /* 8'h00: pcie to MB_CPLD0 */
-            fpga_async_data = 0x00;
+            fpga_spi_mux_data = 0x00;
             break;
         case 48 ... 63:
             /* 8'h01: pcie to MB_CPLD1 */
-            fpga_async_data = 0x01;
+            fpga_spi_mux_data = 0x01;
             break;
         case 64 ... 79:
             /* 8'h00: pcie to MB_CPLD0 */
-            fpga_async_data = 0x00;
+            fpga_spi_mux_data = 0x00;
             break;
         case 80 ... 95:
             /* 8'h01: pcie to MB_CPLD1 */
-            fpga_async_data = 0x01;
+            fpga_spi_mux_data = 0x01;
             break;
         case 96 ... 111:
             /* 8'h02: pcie to Mezz_BOT_L */
-            fpga_async_data = 0x02;
+            fpga_spi_mux_data = 0x02;
             break;
         case 112 ... 127:
             /* 8'h03: pcie to Mezz_BOT_R */
-            fpga_async_data = 0x03;
+            fpga_spi_mux_data = 0x03;
             break;
         case 128 ... 129:
             /* 8'h01: pcie to MB_CPLD1 */
-            fpga_async_data = 0x01;
+            fpga_spi_mux_data = 0x01;
             break;
         default:
             break;
     }
 
-    iowrite8(fpga_async_data, async_reg);
+    iowrite8(fpga_spi_mux_data, spi_mux_reg);
 
     ctrl = oc_getreg(i2c, OCI2C_CONTROL);
     if (polling)
