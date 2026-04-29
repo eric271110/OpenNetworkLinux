@@ -88,6 +88,15 @@ struct ocores_i2c {
 
 #define OCORES_FLAG_BROKEN_IRQ BIT(1) /* Broken IRQ for FU540-C000 SoC */
 
+#define PORT_NUM 130
+/*FPGA SPI*/
+#define SPI_MUX_MB_CPLD0               0x0
+#define SPI_MUX_MB_CPLD1               0x1
+#define SPI_MUX_MEZZ_BOT_L             0x2
+#define SPI_MUX_MEZZ_BOT_R             0x3
+#define SPI_MUX_MEZZ_TOP_L             0x4
+#define SPI_MUX_MEZZ_TOP_R             0x5
+
 static unsigned int timeout = 1;
 module_param(timeout , uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(timeout, "Tiemout for ocores_poll_wait, in unit of milliseconds.");
@@ -111,9 +120,191 @@ do {                                                \
 
 #define IOREMAP_SIZE                        (0x04)
 static void __iomem    *spi_busy_reg=NULL;
-static void __iomem    *async_reg = NULL;
+static void __iomem    *spi_mux_reg = NULL;
 EXPORT_SYMBOL(spi_busy_reg);
-EXPORT_SYMBOL(async_reg);
+EXPORT_SYMBOL(spi_mux_reg);
+
+static const int port_mux[PORT_NUM]= {
+    /* MEZZ_TOP_L */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port1 */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port2 */
+    /* MB_CPLD0 */
+    SPI_MUX_MB_CPLD0, /* OSFP port3 */
+    SPI_MUX_MB_CPLD0, /* OSFP port4 */
+    SPI_MUX_MB_CPLD0, /* OSFP port5 */
+    SPI_MUX_MB_CPLD0, /* OSFP port6 */
+    /* MEZZ_BOT_L */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port7 */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port8 */
+    /* MEZZ_TOP_L */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port9 */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port10 */
+    /* MB_CPLD0 */
+    SPI_MUX_MB_CPLD0, /* OSFP port11 */
+    SPI_MUX_MB_CPLD0, /* OSFP port12 */
+    SPI_MUX_MB_CPLD0, /* OSFP port13 */
+    SPI_MUX_MB_CPLD0, /* OSFP port14 */
+    /* MEZZ_BOT_L */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port15 */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port16 */
+    /* MEZZ_TOP_L */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port17 */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port18 */
+    /* MB_CPLD0 */
+    SPI_MUX_MB_CPLD0, /* OSFP port19 */
+    SPI_MUX_MB_CPLD0, /* OSFP port20 */
+    SPI_MUX_MB_CPLD0, /* OSFP port21 */
+    SPI_MUX_MB_CPLD0, /* OSFP port22 */
+    /* MEZZ_BOT_L */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port23 */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port24 */
+    /* MEZZ_TOP_L */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port25 */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port26 */
+    /* MB_CPLD0 */
+    SPI_MUX_MB_CPLD0, /* OSFP port27 */
+    SPI_MUX_MB_CPLD0, /* OSFP port28 */
+    SPI_MUX_MB_CPLD0, /* OSFP port29 */
+    SPI_MUX_MB_CPLD0, /* OSFP port30 */
+    /* MEZZ_BOT_L */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port31 */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port32 */
+    /* MEZZ_TOP_L */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port33 */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port34 */
+    /* MB_CPLD0 */
+    SPI_MUX_MB_CPLD0, /* OSFP port35 */
+    SPI_MUX_MB_CPLD0, /* OSFP port36 */
+    SPI_MUX_MB_CPLD0, /* OSFP port37 */
+    SPI_MUX_MB_CPLD0, /* OSFP port38 */
+    /* MEZZ_BOT_L */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port39 */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port40 */
+    /* MEZZ_TOP_L */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port41 */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port42 */
+    /* MB_CPLD0 */
+    SPI_MUX_MB_CPLD0, /* OSFP port43 */
+    SPI_MUX_MB_CPLD0, /* OSFP port44 */
+    SPI_MUX_MB_CPLD0, /* OSFP port45 */
+    SPI_MUX_MB_CPLD0, /* OSFP port46 */
+    /* MEZZ_BOT_L */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port47 */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port48 */
+    /* MEZZ_TOP_L */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port49 */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port50 */
+    /* MB_CPLD0 */
+    SPI_MUX_MB_CPLD0, /* OSFP port51 */
+    SPI_MUX_MB_CPLD0, /* OSFP port52 */
+    SPI_MUX_MB_CPLD0, /* OSFP port53 */
+    SPI_MUX_MB_CPLD0, /* OSFP port54 */
+    /* MEZZ_BOT_L */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port55 */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port56 */
+    /* MEZZ_TOP_L */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port57 */
+    SPI_MUX_MEZZ_TOP_L, /* OSFP port58 */
+    /* MB_CPLD0 */
+    SPI_MUX_MB_CPLD0, /* OSFP port59 */
+    SPI_MUX_MB_CPLD0, /* OSFP port60 */
+    SPI_MUX_MB_CPLD0, /* OSFP port61 */
+    SPI_MUX_MB_CPLD0, /* OSFP port62 */
+    /* MEZZ_BOT_L */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port63 */
+    SPI_MUX_MEZZ_BOT_L, /* OSFP port64 */
+    /* MEZZ_TOP_R */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port65 */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port66 */
+    /* MB_CPLD1 */
+    SPI_MUX_MB_CPLD1, /* OSFP port67 */
+    SPI_MUX_MB_CPLD1, /* OSFP port68 */
+    SPI_MUX_MB_CPLD1, /* OSFP port69 */
+    SPI_MUX_MB_CPLD1, /* OSFP port70 */
+    /* MEZZ_BOT_R */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port71 */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port72 */
+    /* MEZZ_TOP_R */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port73 */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port74 */
+    /* MB_CPLD1 */
+    SPI_MUX_MB_CPLD1, /* OSFP port75 */
+    SPI_MUX_MB_CPLD1, /* OSFP port76 */
+    SPI_MUX_MB_CPLD1, /* OSFP port77 */
+    SPI_MUX_MB_CPLD1, /* OSFP port78 */
+    /* MEZZ_BOT_R */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port79 */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port80 */
+    /* MEZZ_TOP_R */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port81 */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port82 */
+    /* MB_CPLD1 */
+    SPI_MUX_MB_CPLD1, /* OSFP port83 */
+    SPI_MUX_MB_CPLD1, /* OSFP port84 */
+    SPI_MUX_MB_CPLD1, /* OSFP port85 */
+    SPI_MUX_MB_CPLD1, /* OSFP port86 */
+    /* MEZZ_BOT_R */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port87 */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port88 */
+    /* MEZZ_TOP_R */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port89 */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port90 */
+    /* MB_CPLD1 */
+    SPI_MUX_MB_CPLD1, /* OSFP port91 */
+    SPI_MUX_MB_CPLD1, /* OSFP port92 */
+    SPI_MUX_MB_CPLD1, /* OSFP port93 */
+    SPI_MUX_MB_CPLD1, /* OSFP port94 */
+    /* MEZZ_BOT_R */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port95 */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port96 */
+    /* MEZZ_TOP_R */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port97 */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port98 */
+    /* MB_CPLD1 */
+    SPI_MUX_MB_CPLD1, /* OSFP port99 */
+    SPI_MUX_MB_CPLD1, /* OSFP port100 */
+    SPI_MUX_MB_CPLD1, /* OSFP port101 */
+    SPI_MUX_MB_CPLD1, /* OSFP port102 */
+    /* MEZZ_BOT_R */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port103 */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port104 */
+    /* MEZZ_TOP_R */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port105 */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port106 */
+    /* MB_CPLD1 */
+    SPI_MUX_MB_CPLD1, /* OSFP port107 */
+    SPI_MUX_MB_CPLD1, /* OSFP port108 */
+    SPI_MUX_MB_CPLD1, /* OSFP port109 */
+    SPI_MUX_MB_CPLD1, /* OSFP port110 */
+    /* MEZZ_BOT_R */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port111 */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port112 */
+    /* MEZZ_TOP_R */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port113 */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port114 */
+    /* MB_CPLD1 */
+    SPI_MUX_MB_CPLD1, /* OSFP port115 */
+    SPI_MUX_MB_CPLD1, /* OSFP port116 */
+    SPI_MUX_MB_CPLD1, /* OSFP port117 */
+    SPI_MUX_MB_CPLD1, /* OSFP port118 */
+    /* MEZZ_BOT_R */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port119 */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port120 */
+    /* MEZZ_TOP_R */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port121 */
+    SPI_MUX_MEZZ_TOP_R, /* OSFP port122 */
+    /* MB_CPLD1 */
+    SPI_MUX_MB_CPLD1, /* OSFP port123 */
+    SPI_MUX_MB_CPLD1, /* OSFP port124 */
+    SPI_MUX_MB_CPLD1, /* OSFP port125 */
+    SPI_MUX_MB_CPLD1, /* OSFP port126 */
+    /* MEZZ_BOT_R */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port127 */
+    SPI_MUX_MEZZ_BOT_R, /* OSFP port128 */
+    /* MB_CPLD1 */
+    SPI_MUX_MB_CPLD1, /* SFP+ port129 */
+    SPI_MUX_MB_CPLD1, /* SFP+ port130 */
+};
 
 int wait_spi(u32 mask, u8 times) {
     u32 data;
@@ -475,7 +666,7 @@ static int ocores_xfer_core(struct ocores_i2c *i2c,
 {
     int ret = 0;
     u8 ctrl;
-    int fpga_async_data;
+    int fpga_spi_mux_data;
 
     LOCK(&cpld_access_lock);
 
@@ -484,56 +675,16 @@ static int ocores_xfer_core(struct ocores_i2c *i2c,
     int port;
 
     if (!i2c->adap.dev.parent) {
+        UNLOCK(&cpld_access_lock);
         return -EFAULT;
     }
 
-    /* Get FPGA async mux from pdev->id */
+    /* Get FPGA spi mux from pdev->id */
     dev = i2c->adap.dev.parent;
     pdev = container_of(dev, struct platform_device, dev);
     port = (pdev->id & 0x00FF);
-    switch (port)
-    {
-        case 0 ... 15:
-            /* 8'h04: pcie to Mezz_TOP_L */
-            fpga_async_data = 0x04;
-            break;
-        case 16 ... 31:
-            /* 8'h05: pcie to Mezz_TOP_R */
-            fpga_async_data = 0x05;
-            break;
-        case 32 ... 47:
-            /* 8'h00: pcie to MB_CPLD0 */
-            fpga_async_data = 0x00;
-            break;
-        case 48 ... 63:
-            /* 8'h01: pcie to MB_CPLD1 */
-            fpga_async_data = 0x01;
-            break;
-        case 64 ... 79:
-            /* 8'h00: pcie to MB_CPLD0 */
-            fpga_async_data = 0x00;
-            break;
-        case 80 ... 95:
-            /* 8'h01: pcie to MB_CPLD1 */
-            fpga_async_data = 0x01;
-            break;
-        case 96 ... 111:
-            /* 8'h02: pcie to Mezz_BOT_L */
-            fpga_async_data = 0x02;
-            break;
-        case 112 ... 127:
-            /* 8'h03: pcie to Mezz_BOT_R */
-            fpga_async_data = 0x03;
-            break;
-        case 128 ... 129:
-            /* 8'h01: pcie to MB_CPLD1 */
-            fpga_async_data = 0x01;
-            break;
-        default:
-            break;
-    }
-
-    iowrite8(fpga_async_data, async_reg);
+    fpga_spi_mux_data = port_mux[port];
+    iowrite8(fpga_spi_mux_data, spi_mux_reg);
 
     ctrl = oc_getreg(i2c, OCI2C_CONTROL);
     if (polling)
