@@ -69,7 +69,7 @@ struct as1813_128_led_data {
     struct mutex update_lock;
     char valid;           /* != 0 if registers are valid */
     unsigned long last_updated;    /* In jiffies */
-    unsigned char ipmi_resp[6]; /* 0:Loc 1:Diag 2:Gnss 3:Fan 4:Psu1 5:Psu2 */
+    unsigned char ipmi_resp[5]; /* 0:Loc 1:Diag 2:Gnss 3:Fan 4:Psu */
     struct ipmi_data ipmi;
 };
 
@@ -126,8 +126,7 @@ enum as1813_128_led_sysfs_attrs {
     LED_DIAG,
     LED_ALARM,
     LED_FAN,
-    LED_PSU1,
-    LED_PSU2
+    LED_PSU
 };
 
 static SENSOR_DEVICE_ATTR(led_loc, S_IWUSR | S_IRUGO, show_led, set_led,
@@ -138,18 +137,15 @@ static SENSOR_DEVICE_ATTR(led_alarm, S_IWUSR | S_IRUGO, show_led, set_led,
                             LED_ALARM);
 static SENSOR_DEVICE_ATTR(led_fan, S_IWUSR | S_IRUGO, show_led, set_led,
                             LED_FAN);
-static SENSOR_DEVICE_ATTR(led_psu1, S_IWUSR | S_IRUGO, show_led, set_led,
-                            LED_PSU1);
-static SENSOR_DEVICE_ATTR(led_psu2, S_IWUSR | S_IRUGO, show_led, set_led,
-                            LED_PSU2);
+static SENSOR_DEVICE_ATTR(led_psu, S_IWUSR | S_IRUGO, show_led, set_led,
+                            LED_PSU);
 
 static struct attribute *as1813_128_led_attributes[] = {
     &sensor_dev_attr_led_loc.dev_attr.attr,
     &sensor_dev_attr_led_diag.dev_attr.attr,
     &sensor_dev_attr_led_alarm.dev_attr.attr,
     &sensor_dev_attr_led_fan.dev_attr.attr,
-    &sensor_dev_attr_led_psu1.dev_attr.attr,
-    &sensor_dev_attr_led_psu2.dev_attr.attr,
+    &sensor_dev_attr_led_psu.dev_attr.attr,
     NULL
 };
 
@@ -550,7 +546,7 @@ static void __exit as1813_128_led_exit(void)
     kfree(data);
 }
 
-MODULE_AUTHOR("Roger Ho <roger530_ho@edge-core.com>");
+MODULE_AUTHOR("Eric Yang <eric_yang@accton.com>");
 MODULE_DESCRIPTION("as1813_128_led driver");
 MODULE_LICENSE("GPL");
 

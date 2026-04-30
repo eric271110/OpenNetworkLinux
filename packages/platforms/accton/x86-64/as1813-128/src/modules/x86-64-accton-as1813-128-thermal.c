@@ -36,7 +36,7 @@
 #define DRVNAME "as1813_128_thermal"
 #define ACCTON_IPMI_NETFN 0x34
 #define IPMI_THERMAL_READ_CMD 0x12
-#define THERMAL_COUNT    8
+#define THERMAL_COUNT    15
 #define THERMAL_DATA_LEN 3
 #define THERMAL_DATA_COUNT (THERMAL_COUNT * THERMAL_DATA_LEN)
 
@@ -46,10 +46,6 @@
 static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data);
 static ssize_t show_temp(struct device *dev, struct device_attribute *attr,
     char *buf);
-#ifdef ENABLE_THRESHOLD
-static ssize_t show_threshold(struct device *dev, struct device_attribute *da,
-    char *buf);
-#endif
 static int as1813_128_thermal_probe(struct platform_device *pdev);
 static int as1813_128_thermal_remove(struct platform_device *pdev);
 
@@ -88,13 +84,6 @@ struct as1813_128_thermal_data {
     unsigned char ipmi_tx_data[2];  /* 0: thermal id, 1: temp */
 };
 
-#ifdef ENABLE_THRESHOLD
-static s8 temp_max_alarm[THERMAL_COUNT] = { 85, 85, 85, 79, 92, 85, 92, 92};
-static s8 temp_max[THERMAL_COUNT] = { 80, 80, 80, 74, 87, 80, 87, 87 };
-static s8 temp_min[THERMAL_COUNT] = { -45, -45, -45, -45, -45, -45, -45, -45 };
-static s8 temp_min_alarm[THERMAL_COUNT] = { -50, -50, -50, -50, -50, -50, -50, -50 };
-#endif
-
 struct as1813_128_thermal_data *data = NULL;
 
 static struct platform_driver as1813_128_thermal_driver = {
@@ -107,76 +96,29 @@ static struct platform_driver as1813_128_thermal_driver = {
 };
 
 enum as1813_128_thermal_sysfs_attrs {
-    TEMP1_INPUT, // 0x48
-    TEMP2_INPUT, // 0x49
-    TEMP3_INPUT, // 0x4A
-    TEMP4_INPUT, // 0x4B
-    TEMP5_INPUT, // 0x4C
-    TEMP6_INPUT, // 0x4D
-    TEMP7_INPUT, // FAN 0x4D
-    TEMP8_INPUT, // FAN 0x4E
-    TEMP1_MAX_ALARM,
-    TEMP2_MAX_ALARM,
-    TEMP3_MAX_ALARM,
-    TEMP4_MAX_ALARM,
-    TEMP5_MAX_ALARM,
-    TEMP6_MAX_ALARM,
-    TEMP7_MAX_ALARM,
-    TEMP8_MAX_ALARM,
-    TEMP1_MAX,
-    TEMP2_MAX,
-    TEMP3_MAX,
-    TEMP4_MAX,
-    TEMP5_MAX,
-    TEMP6_MAX,
-    TEMP7_MAX,
-    TEMP8_MAX,
-    TEMP1_MIN,
-    TEMP2_MIN,
-    TEMP3_MIN,
-    TEMP4_MIN,
-    TEMP5_MIN,
-    TEMP6_MIN,
-    TEMP7_MIN,
-    TEMP8_MIN,
-    TEMP1_MIN_ALARM,
-    TEMP2_MIN_ALARM,
-    TEMP3_MIN_ALARM,
-    TEMP4_MIN_ALARM,
-    TEMP5_MIN_ALARM,
-    TEMP6_MIN_ALARM,
-    TEMP7_MIN_ALARM,
-    TEMP8_MIN_ALARM,
+    TEMP1_INPUT, // CB 0x48
+    TEMP2_INPUT, // MB 0x48
+    TEMP3_INPUT, // MB 0x49
+    TEMP4_INPUT, // MB 0x4A
+    TEMP5_INPUT, // MB 0x4B
+    TEMP6_INPUT, // MB 0x4C
+    TEMP7_INPUT, // MB 0x4D
+    TEMP8_INPUT, // MEZZ_TOP-R 0x48
+    TEMP9_INPUT, // MEZZ_TOP-L 0x48
+    TEMP10_INPUT, // MEZZ_BOT-R 0x48
+    TEMP11_INPUT, // MEZZ_BOT-L 0x48
+    TEMP12_INPUT, // FCM0 FAN 0x4D
+    TEMP13_INPUT, // FCM0 FAN 0x4E
+    TEMP14_INPUT, // FCM1 FAN 0x4D
+    TEMP15_INPUT, // FCM1 FAN 0x4E
 };
 
-#ifdef ENABLE_THRESHOLD
-// Read only temp_input
-#define DECLARE_THERMAL_SENSOR_DEVICE_ATTR(index) \
-    static SENSOR_DEVICE_ATTR(temp##index##_input, S_IRUGO, show_temp, \
-                    NULL, TEMP##index##_INPUT); \
-    static SENSOR_DEVICE_ATTR(temp##index##_crit, S_IRUGO, show_threshold,\
-                    NULL, TEMP##index##_MAX_ALARM); \
-    static SENSOR_DEVICE_ATTR(temp##index##_max, S_IRUGO, show_threshold,\
-                    NULL, TEMP##index##_MAX); \
-    static SENSOR_DEVICE_ATTR(temp##index##_min, S_IRUGO, show_threshold,\
-                    NULL, TEMP##index##_MIN); \
-    static SENSOR_DEVICE_ATTR(temp##index##_lcrit, S_IRUGO, show_threshold,\
-                    NULL, TEMP##index##_MIN_ALARM)
-
-#define DECLARE_THERMAL_ATTR(index) \
-    &sensor_dev_attr_temp##index##_input.dev_attr.attr, \
-    &sensor_dev_attr_temp##index##_crit.dev_attr.attr, \
-    &sensor_dev_attr_temp##index##_max.dev_attr.attr, \
-    &sensor_dev_attr_temp##index##_min.dev_attr.attr, \
-    &sensor_dev_attr_temp##index##_lcrit.dev_attr.attr
-#else
 #define DECLARE_THERMAL_SENSOR_DEVICE_ATTR(index) \
     static SENSOR_DEVICE_ATTR(temp##index##_input, S_IRUGO, show_temp, \
                     NULL, TEMP##index##_INPUT); 
 
 #define DECLARE_THERMAL_ATTR(index) \
     &sensor_dev_attr_temp##index##_input.dev_attr.attr
-#endif
 
 DECLARE_THERMAL_SENSOR_DEVICE_ATTR(1);
 DECLARE_THERMAL_SENSOR_DEVICE_ATTR(2);
@@ -186,6 +128,13 @@ DECLARE_THERMAL_SENSOR_DEVICE_ATTR(5);
 DECLARE_THERMAL_SENSOR_DEVICE_ATTR(6);
 DECLARE_THERMAL_SENSOR_DEVICE_ATTR(7);
 DECLARE_THERMAL_SENSOR_DEVICE_ATTR(8);
+DECLARE_THERMAL_SENSOR_DEVICE_ATTR(9);
+DECLARE_THERMAL_SENSOR_DEVICE_ATTR(10);
+DECLARE_THERMAL_SENSOR_DEVICE_ATTR(11);
+DECLARE_THERMAL_SENSOR_DEVICE_ATTR(12);
+DECLARE_THERMAL_SENSOR_DEVICE_ATTR(13);
+DECLARE_THERMAL_SENSOR_DEVICE_ATTR(14);
+DECLARE_THERMAL_SENSOR_DEVICE_ATTR(15);
 
 static struct attribute *as1813_128_thermal_attrs[] = {
     DECLARE_THERMAL_ATTR(1),
@@ -196,6 +145,13 @@ static struct attribute *as1813_128_thermal_attrs[] = {
     DECLARE_THERMAL_ATTR(6),
     DECLARE_THERMAL_ATTR(7),
     DECLARE_THERMAL_ATTR(8),
+    DECLARE_THERMAL_ATTR(9),
+    DECLARE_THERMAL_ATTR(10),
+    DECLARE_THERMAL_ATTR(11),
+    DECLARE_THERMAL_ATTR(12),
+    DECLARE_THERMAL_ATTR(13),
+    DECLARE_THERMAL_ATTR(14),
+    DECLARE_THERMAL_ATTR(15),
     NULL
 };
 ATTRIBUTE_GROUPS(as1813_128_thermal);
@@ -354,42 +310,6 @@ static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data)
     complete(&ipmi->read_complete);
 }
 
-#ifdef ENABLE_THRESHOLD
-static ssize_t show_threshold(struct device *dev, struct device_attribute *da,
-                            char *buf)
-{
-    int status = 0;
-    struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
-
-    mutex_lock(&data->update_lock);
-
-    switch (attr->index) {
-    case TEMP1_MAX_ALARM ... TEMP8_MAX_ALARM:
-        status = (int)temp_max_alarm[attr->index - TEMP1_MAX_ALARM];
-        break;
-    case TEMP1_MAX ... TEMP8_MAX:
-        status = (int)temp_max[attr->index - TEMP1_MAX];
-        break;
-    case TEMP1_MIN ... TEMP8_MIN:
-        status = (int)temp_min[attr->index - TEMP1_MIN];
-        break;
-    case TEMP1_MIN_ALARM ... TEMP8_MIN_ALARM:
-        status = (int)temp_min_alarm[attr->index - TEMP1_MIN_ALARM];
-        break;
-    default:
-        status = -EINVAL;
-        goto exit;
-    }
-
-    mutex_unlock(&data->update_lock);
-    return sprintf(buf, "%d\n", status * 1000);
-
-exit:
-    mutex_unlock(&data->update_lock);
-    return status;
-}
-#endif
-
 static ssize_t show_temp(struct device *dev, struct device_attribute *da,
                             char *buf)
 {
@@ -518,7 +438,7 @@ static void __exit as1813_128_thermal_exit(void)
     }
 }
 
-MODULE_AUTHOR("Roger Ho <roger530_ho@edge-core.com>");
+MODULE_AUTHOR("Eric Yang <eric_yang@edge-core.com>");
 MODULE_DESCRIPTION("as1813_128_thermal driver");
 MODULE_LICENSE("GPL");
 

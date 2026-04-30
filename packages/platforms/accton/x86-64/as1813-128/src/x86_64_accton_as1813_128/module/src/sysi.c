@@ -123,15 +123,7 @@ static char* cpld_ver_path[NUM_OF_CPLD_VER] = {
 const char*
 onlp_sysi_platform_get(void)
 {
-    as1813_128_platform_id_t pid = get_platform_id();
-
-    switch (pid) {
-        case AS1813_128O: return "x86-64-accton-as1813-128o-r0";
-        case AS1813_128D: return "x86-64-accton-as1813-128d-r0";
-        default: break;
-    }
-
-    return "Unknown Platform";
+    return "x86-64-accton-as1813-128o-r0";
 }
 
 int

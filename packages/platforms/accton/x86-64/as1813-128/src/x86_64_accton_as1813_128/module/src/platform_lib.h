@@ -28,21 +28,23 @@
 
 #include "x86_64_accton_as1813_128_log.h"
 
-#define CHASSIS_FAN_COUNT      8
-#define CHASSIS_THERMAL_COUNT  9
-#define CHASSIS_LED_COUNT      6
-#define CHASSIS_PSU_COUNT      2
+#define CHASSIS_FAN_COUNT      16
+#define CHASSIS_THERMAL_COUNT  15
+#define CHASSIS_LED_COUNT      5
+#define CHASSIS_PSU_COUNT      4
 #define NUM_OF_THERMAL_PER_PSU 3
 
 #define PSU1_ID 1
 #define PSU2_ID 2
+#define PSU3_ID 3
+#define PSU4_ID 4
 
 #define PSU_SYSFS_FORMAT   "/sys/devices/platform/as1813_128_psu.%d*psu%d_%s"
 #define PSU_SYSFS_FORMAT_1 "/sys/devices/platform/as1813_128_psu.%d/hwmon/hwmon%d/%s"
 #define FAN_SYSFS_FORMAT   "/sys/devices/platform/as1813_128_fan*"
 #define FAN_SYSFS_FORMAT_1 "/sys/devices/platform/as1813_128_fan/hwmon/hwmon%d/%s"
 #define SYS_LED_PATH   "/sys/devices/platform/as1813_128_led/"
-#define IDPROM_PATH "/sys/bus/i2c/devices/67-0056/eeprom"
+#define IDPROM_PATH "/sys/bus/i2c/devices/as1813_128_sys/eeprom"
 
 enum onlp_thermal_id {
     THERMAL_RESERVED = 0,
@@ -67,8 +69,7 @@ enum onlp_thermal_id {
 enum onlp_led_id {
     LED_LOC = 1,
     LED_DIAG,
-    LED_PSU1,
-    LED_PSU2,
+    LED_PSU,
     LED_FAN,
     LED_ALARM
 };

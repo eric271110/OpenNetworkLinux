@@ -1,5 +1,5 @@
 /*
- * Copyright (C)  Roger Ho <roger530_ho@edge-core.com>
+ * Copyright (C)  Eric Yang <eric_yang@accton.com>
  *
  * Based on:
  *    pca954x.c from Kumar Gala <galak@kernel.crashing.org>
@@ -33,22 +33,23 @@
 #include <linux/string_helpers.h>
 
 #define DRVNAME "as1813_128_sys"
-#define ACCTON_IPMI_NETFN 0x34
+#define IPMI_SYSEEPROM_READ_CMD 0x18
+#define IPMI_READ_MAX_LEN       128
 
-#define IPMI_TIMEOUT (5 * HZ)
-#define IPMI_ERR_RETRY_TIMES 1
-#define IPMI_READ_MAX_LEN 128
+#define EEPROM_NAME             "eeprom"
+#define EEPROM_SIZE             256 /*  256 byte eeprom */
 
-#define IPMI_CPLD_READ_CMD 0x20
-#define IPMI_OTP_PROTECT_CMD 0x94
+#define IPMI_CPLD_READ_CMD             0x20
+#define IPMI_CPLD_COM_E_CMD            0x21
+#define IPMI_CPLD_1U_FAN_CMD           0x34
+#define IPMI_CPLD_2U_FAN_CMD           0x33
+#define IPMI_CPLD_FPGA_CMD             0x61
+#define IPMI_CPLD_MB_CPLD0_CMD         0x62
+#define IPMI_CPLD_MB_CPLD1_CMD         0x63
 
-static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data);
 static int as1813_128_sys_probe(struct platform_device *pdev);
 static int as1813_128_sys_remove(struct platform_device *pdev);
-static ssize_t show_version(struct device *dev,
-                                struct device_attribute *da, char *buf);
-static ssize_t set_otp_protect(struct device *dev, struct device_attribute *da,
-            const char *buf, size_t count);
+static ssize_t show_cpld_version(struct device *dev, struct device_attribute *da, char *buf);
 
 struct ipmi_data {
     struct completion read_complete;
@@ -69,36 +70,50 @@ struct ipmi_data {
 
 struct as1813_128_sys_data {
     struct platform_device *pdev;
-    struct mutex update_lock;
-    char valid; /* != 0 if registers are valid */
-    unsigned long last_updated;    /* In jiffies */
+    struct mutex     update_lock;
+    char             valid;           /* != 0 if registers are valid */
+    unsigned long    last_updated;    /* In jiffies */
     struct ipmi_data ipmi;
-    unsigned char ipmi_resp_cpld[2];
-    unsigned char ipmi_tx_data[2];
+    unsigned char    ipmi_resp_eeprom[EEPROM_SIZE];
+    unsigned char    ipmi_resp_cpld[2];
+    unsigned char    ipmi_tx_data[2];
+    struct bin_attribute eeprom;      /* eeprom data */
 };
 
 struct as1813_128_sys_data *data = NULL;
 
 static struct platform_driver as1813_128_sys_driver = {
-    .probe = as1813_128_sys_probe,
-    .remove = as1813_128_sys_remove,
-    .driver = {
-        .name = DRVNAME,
-        .owner = THIS_MODULE,
+    .probe      = as1813_128_sys_probe,
+    .remove     = as1813_128_sys_remove,
+    .driver     = {
+        .name   = DRVNAME,
+        .owner  = THIS_MODULE,
     },
 };
 
-enum as1813_128_sys_sysfs_attrs {
-    FPGA_VER, /* FPGA version */
-    OTP_PROTECT
+enum as5916_54xks_sys_sysfs_attrs {
+    CPU_CPLD,
+    MB_FPGA,
+    MB_CPLD0,
+    MB_CPLD1,
+    FAN_CPLD1,
+    FAN_CPLD2
 };
-
-static SENSOR_DEVICE_ATTR(fpga_version, S_IRUGO, show_version, NULL, FPGA_VER);
-static SENSOR_DEVICE_ATTR(otp_protect, S_IWUSR, NULL, set_otp_protect, OTP_PROTECT);
+/* Functions to talk to the IPMI layer */
+static SENSOR_DEVICE_ATTR(cpu_cpld_ver, S_IRUGO, show_cpld_version, NULL, CPU_CPLD);
+static SENSOR_DEVICE_ATTR(fpga_ver, S_IRUGO, show_cpld_version, NULL, MB_FPGA);
+static SENSOR_DEVICE_ATTR(mb_cpld0_ver, S_IRUGO, show_cpld_version, NULL, MB_CPLD0);
+static SENSOR_DEVICE_ATTR(mb_cpld1_ver, S_IRUGO, show_cpld_version, NULL, MB_CPLD1);
+static SENSOR_DEVICE_ATTR(fan_cpld1_ver, S_IRUGO, show_cpld_version, NULL, FAN_CPLD1);
+static SENSOR_DEVICE_ATTR(fan_cpld2_ver, S_IRUGO, show_cpld_version, NULL, FAN_CPLD2);
 
 static struct attribute *as1813_128_sys_attributes[] = {
-    &sensor_dev_attr_fpga_version.dev_attr.attr,
-    &sensor_dev_attr_otp_protect.dev_attr.attr,
+    &sensor_dev_attr_cpu_cpld_ver.dev_attr.attr,
+    &sensor_dev_attr_fpga_ver.dev_attr.attr,
+    &sensor_dev_attr_mb_cpld0_ver.dev_attr.attr,
+    &sensor_dev_attr_mb_cpld1_ver.dev_attr.attr,
+    &sensor_dev_attr_fan_cpld1_ver.dev_attr.attr,
+    &sensor_dev_attr_fan_cpld2_ver.dev_attr.attr,
     NULL
 };
 
@@ -261,12 +276,100 @@ static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data)
     complete(&ipmi->read_complete);
 }
 
-static struct as1813_128_sys_data *as1813_128_sys_update_fpga_ver(void)
+static ssize_t sys_eeprom_read(loff_t off, char *buf, size_t count)
+{
+    int status = 0;
+    unsigned char length = 0;
+
+    if ((off + count) > EEPROM_SIZE) {
+        return -EINVAL;
+    }
+
+    length = (count >= IPMI_READ_MAX_LEN) ? IPMI_READ_MAX_LEN : count;
+    data->ipmi_tx_data[0] = (off & 0xff);
+    data->ipmi_tx_data[1] = length;
+    status = ipmi_send_message(&data->ipmi, IPMI_SYSEEPROM_READ_CMD,
+                                data->ipmi_tx_data, sizeof(data->ipmi_tx_data),
+                                data->ipmi_resp_eeprom + off, length);
+    if (unlikely(status != 0)) {
+        goto exit;
+    }
+
+    if (unlikely(data->ipmi.rx_result != 0)) {
+        status = -EIO;
+        goto exit;
+    }
+
+    status = length; /* Read length */
+    memcpy(buf, data->ipmi_resp_eeprom + off, length);
+
+exit:
+    return status;
+}
+
+static ssize_t sysfs_bin_read(struct file *filp, struct kobject *kobj,
+        struct bin_attribute *attr,
+        char *buf, loff_t off, size_t count)
+{
+    ssize_t retval = 0;
+
+    if (unlikely(!count)) {
+        return count;
+    }
+
+    /*
+     * Read data from chip, protecting against concurrent updates
+     * from this host
+     */
+    mutex_lock(&data->update_lock);
+
+    while (count) {
+        ssize_t status;
+
+        status = sys_eeprom_read(off, buf, count);
+        if (status <= 0) {
+            if (retval == 0) {
+                retval = status;
+            }
+            break;
+        }
+
+        buf += status;
+        off += status;
+        count -= status;
+        retval += status;
+    }
+
+    mutex_unlock(&data->update_lock);
+    return retval;
+
+}
+
+static int sysfs_eeprom_init(struct kobject *kobj, struct bin_attribute *eeprom)
+{
+    sysfs_bin_attr_init(eeprom);
+    eeprom->attr.name = EEPROM_NAME;
+    eeprom->attr.mode = S_IRUGO;
+    eeprom->read      = sysfs_bin_read;
+    eeprom->write     = NULL;
+    eeprom->size      = EEPROM_SIZE;
+
+    /* Create eeprom file */
+    return sysfs_create_bin_file(kobj, eeprom);
+}
+
+static int sysfs_eeprom_cleanup(struct kobject *kobj, struct bin_attribute *eeprom)
+{
+    sysfs_remove_bin_file(kobj, eeprom);
+    return 0;
+}
+
+static struct as1813_128_sys_data *as1813_128_sys_update_cpld_ver(unsigned char cpld_addr)
 {
     int status = 0;
 
     data->valid = 0;
-    data->ipmi_tx_data[0] = 0x60;
+    data->ipmi_tx_data[0] = cpld_addr;
     status = ipmi_send_message(&data->ipmi, IPMI_CPLD_READ_CMD,
                                 data->ipmi_tx_data, 1,
                                 data->ipmi_resp_cpld,
@@ -286,16 +389,39 @@ exit:
     return data;
 }
 
-static ssize_t show_version(struct device *dev,
-                                struct device_attribute *da, char *buf)
+static ssize_t show_cpld_version(struct device *dev, struct device_attribute *da, char *buf)
 {
+    struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
     unsigned char major;
     unsigned char minor;
+    unsigned char cpld_addr = 0;
     int error = 0;
+
+    switch (attr->index) {
+        case CPU_CPLD:
+            cpld_addr = IPMI_CPLD_COM_E_CMD;
+            break;
+        case MB_FPGA:
+            cpld_addr = IPMI_CPLD_FPGA_CMD;
+            break;
+        case MB_CPLD0:
+            cpld_addr = IPMI_CPLD_MB_CPLD0_CMD;
+            break;
+        case MB_CPLD1:
+            cpld_addr = IPMI_CPLD_MB_CPLD1_CMD;
+            break;
+        case FAN_CPLD1:
+            cpld_addr = IPMI_CPLD_1U_FAN_CMD;
+        case FAN_CPLD2:
+            cpld_addr = IPMI_CPLD_2U_FAN_CMD;
+            break;
+        default:
+            return -EINVAL;
+    }
 
     mutex_lock(&data->update_lock);
 
-    data = as1813_128_sys_update_fpga_ver();
+    data = as1813_128_sys_update_cpld_ver(cpld_addr);
     if (!data->valid) {
         error = -EIO;
         goto exit;
@@ -308,47 +434,18 @@ static ssize_t show_version(struct device *dev,
 
 exit:
     mutex_unlock(&data->update_lock);
-    return error;
-}
-
-static ssize_t set_otp_protect(struct device *dev, struct device_attribute *da,
-            const char *buf, size_t count)
-{
-    long otp_protect;
-    int status;
-
-    status = kstrtol(buf, 10, &otp_protect);
-    if (status)
-        return status;
-
-    if (!otp_protect)
-        return count;
-
-    mutex_lock(&data->update_lock);
-
-    data->ipmi_tx_data[0] = 3;
-    status = ipmi_send_message(&data->ipmi, IPMI_OTP_PROTECT_CMD,
-                                data->ipmi_tx_data, 1,
-                                NULL, 0);
-    if (unlikely(status != 0))
-        goto exit;
-
-    if (unlikely(data->ipmi.rx_result != 0)) {
-        status = -EIO;
-        goto exit;
-    }
-
-    status = count;
-
-exit:
-    mutex_unlock(&data->update_lock);
-    return status;
+    return error;    
 }
 
 static int as1813_128_sys_probe(struct platform_device *pdev)
 {
     int status = -1;
 
+    /* Register sysfs hooks */
+    status = sysfs_eeprom_init(&pdev->dev.kobj, &data->eeprom);
+    if (status) {
+        goto exit;
+    }
     /* Register sysfs hooks */
     status = sysfs_create_group(&pdev->dev.kobj, &as1813_128_sys_group);
     if (status)
@@ -364,6 +461,7 @@ exit:
 
 static int as1813_128_sys_remove(struct platform_device *pdev)
 {
+    sysfs_eeprom_cleanup(&pdev->dev.kobj, &data->eeprom);
     sysfs_remove_group(&pdev->dev.kobj, &as1813_128_sys_group);
 
     return 0;
@@ -382,8 +480,9 @@ static int __init as1813_128_sys_init(void)
     mutex_init(&data->update_lock);
 
     ret = platform_driver_register(&as1813_128_sys_driver);
-    if (ret < 0)
+    if (ret < 0) {
         goto dri_reg_err;
+    }
 
     data->pdev = platform_device_register_simple(DRVNAME, -1, NULL, 0);
     if (IS_ERR(data->pdev)) {
@@ -416,7 +515,7 @@ static void __exit as1813_128_sys_exit(void)
     kfree(data);
 }
 
-MODULE_AUTHOR("Roger Ho <roger530_ho@edge-core.com>");
+MODULE_AUTHOR("Eric Yang <eric_yang@accton.com.tw>");
 MODULE_DESCRIPTION("as1813_128_sys driver");
 MODULE_LICENSE("GPL");
 

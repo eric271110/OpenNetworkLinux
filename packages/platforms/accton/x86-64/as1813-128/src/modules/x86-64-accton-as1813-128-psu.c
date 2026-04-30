@@ -57,6 +57,8 @@ static int as1813_128_psu_remove(struct platform_device *pdev);
 enum psu_id {
     PSU_1,
     PSU_2,
+    PSU_3,
+    PSU_4,
     NUM_OF_PSU
 };
 
@@ -174,13 +176,13 @@ struct ipmi_psu_resp_data {
 };
 
 struct as1813_128_psu_data {
-    struct platform_device *pdev[2];
-    struct device   *hwmon_dev[2];
+    struct platform_device *pdev[NUM_OF_PSU];
+    struct device   *hwmon_dev[NUM_OF_PSU];
     struct mutex update_lock;
-    char valid[2]; /* != 0 if registers are valid, 0: PSU1, 1: PSU2 */
-    unsigned long last_updated[2];    /* In jiffies, 0: PSU1, 1: PSU2 */
+    char valid[NUM_OF_PSU]; /* != 0 if registers are valid */
+    unsigned long last_updated[NUM_OF_PSU];    /* In jiffies */
     struct ipmi_data ipmi;
-    struct ipmi_psu_resp_data ipmi_resp[2]; /* 0: PSU1, 1: PSU2 */
+    struct ipmi_psu_resp_data ipmi_resp[NUM_OF_PSU];
     unsigned char ipmi_tx_data[2];
 };
 
@@ -265,6 +267,8 @@ enum as1813_128_psu_sysfs_attrs {
     /* psu attributes */
     PSU_ATTR(1),
     PSU_ATTR(2),
+    PSU_ATTR(3),
+    PSU_ATTR(4),
     NUM_OF_PSU_ATTR,
     NUM_OF_PER_PSU_ATTR = (NUM_OF_PSU_ATTR/NUM_OF_PSU)
 };
@@ -410,11 +414,54 @@ static struct attribute *as1813_128_psu2_attrs[] = {
 static struct attribute_group as1813_128_psu2_group = {
     .attrs = as1813_128_psu2_attrs,
 };
-/* ATTRIBUTE_GROUPS(as1813_128_psu2); */
+
+DECLARE_PSU_SENSOR_DEVICE_ATTR(3);
+/*Duplicate nodes for lm-sensors.*/
+static SENSOR_DEVICE_ATTR(in2_input, S_IRUGO, show_psu, NULL, PSU3_VOUT);
+static SENSOR_DEVICE_ATTR(curr3_input, S_IRUGO, show_psu, NULL, PSU3_IOUT);
+static SENSOR_DEVICE_ATTR(power3_input, S_IRUGO, show_psu, NULL, PSU3_POUT);
+static SENSOR_DEVICE_ATTR(temp3_input, S_IRUGO, show_psu, NULL, PSU3_TEMP1_INPUT);
+static SENSOR_DEVICE_ATTR(fan3_input, S_IRUGO, show_psu, NULL, PSU3_FAN_INPUT);
+static struct attribute *as1813_128_psu3_attrs[] = {
+    /* psu attributes */
+    DECLARE_PSU_ATTR(3),
+    &sensor_dev_attr_curr3_input.dev_attr.attr,
+    &sensor_dev_attr_in2_input.dev_attr.attr,
+    &sensor_dev_attr_power3_input.dev_attr.attr,
+    &sensor_dev_attr_temp3_input.dev_attr.attr,
+    &sensor_dev_attr_fan3_input.dev_attr.attr,
+    NULL
+};
+static struct attribute_group as1813_128_psu3_group = {
+    .attrs = as1813_128_psu3_attrs,
+};
+
+DECLARE_PSU_SENSOR_DEVICE_ATTR(4);
+/*Duplicate nodes for lm-sensors.*/
+static SENSOR_DEVICE_ATTR(in3_input, S_IRUGO, show_psu, NULL, PSU4_VOUT);
+static SENSOR_DEVICE_ATTR(curr4_input, S_IRUGO, show_psu, NULL, PSU4_IOUT);
+static SENSOR_DEVICE_ATTR(power4_input, S_IRUGO, show_psu, NULL, PSU4_POUT);
+static SENSOR_DEVICE_ATTR(temp4_input, S_IRUGO, show_psu, NULL, PSU4_TEMP1_INPUT);
+static SENSOR_DEVICE_ATTR(fan4_input, S_IRUGO, show_psu, NULL, PSU4_FAN_INPUT);
+static struct attribute *as1813_128_psu4_attrs[] = {
+    /* psu attributes */
+    DECLARE_PSU_ATTR(4),
+    &sensor_dev_attr_curr4_input.dev_attr.attr,
+    &sensor_dev_attr_in3_input.dev_attr.attr,
+    &sensor_dev_attr_power4_input.dev_attr.attr,
+    &sensor_dev_attr_temp4_input.dev_attr.attr,
+    &sensor_dev_attr_fan4_input.dev_attr.attr,
+    NULL
+};
+static struct attribute_group as1813_128_psu4_group = {
+    .attrs = as1813_128_psu4_attrs,
+};
 
 const struct attribute_group *as1813_128_psu_groups[][2] = {
     {&as1813_128_psu1_group, NULL},
-    {&as1813_128_psu2_group, NULL}
+    {&as1813_128_psu2_group, NULL},
+    {&as1813_128_psu3_group, NULL},
+    {&as1813_128_psu4_group, NULL}
 };
 
 /* Functions to talk to the IPMI layer */
@@ -695,15 +742,21 @@ static ssize_t show_psu(struct device *dev, struct device_attribute *da,
     switch (attr->index) {
     case PSU1_PRESENT:
     case PSU2_PRESENT:
+    case PSU3_PRESENT:
+    case PSU4_PRESENT:
         value = present;
         break;
     case PSU1_POWER_GOOD:
     case PSU2_POWER_GOOD:
+    case PSU3_POWER_GOOD:
+    case PSU4_POWER_GOOD:
         VALIDATE_PRESENT_RETURN(pid);
         value = data->ipmi_resp[pid].status[PSU_POWER_GOOD_PMBUS];
         break;
     case PSU1_IIN:
     case PSU2_IIN:
+    case PSU3_IIN:
+    case PSU4_IIN:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].status[PSU_IIN0] |
                     (u32)data->ipmi_resp[pid].status[PSU_IIN1] << 8 |
@@ -711,6 +764,8 @@ static ssize_t show_psu(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_IOUT:
     case PSU2_IOUT:
+    case PSU3_IOUT:
+    case PSU4_IOUT:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].status[PSU_IOUT0] |
                     (u32)data->ipmi_resp[pid].status[PSU_IOUT1] << 8 |
@@ -718,6 +773,8 @@ static ssize_t show_psu(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_VIN:
     case PSU2_VIN:
+    case PSU3_VIN:
+    case PSU4_VIN:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].status[PSU_VIN0] |
                     (u32)data->ipmi_resp[pid].status[PSU_VIN1] << 8 |
@@ -725,6 +782,8 @@ static ssize_t show_psu(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_VOUT:
     case PSU2_VOUT:
+    case PSU3_VOUT:
+    case PSU4_VOUT:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].status[PSU_VOUT0] |
                     (u32)data->ipmi_resp[pid].status[PSU_VOUT1] << 8 |
@@ -732,6 +791,8 @@ static ssize_t show_psu(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_PIN:
     case PSU2_PIN:
+    case PSU3_PIN:
+    case PSU4_PIN:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].status[PSU_PIN0] |
                     (u32)data->ipmi_resp[pid].status[PSU_PIN1] << 8  |
@@ -741,6 +802,8 @@ static ssize_t show_psu(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_POUT:
     case PSU2_POUT:
+    case PSU3_POUT:
+    case PSU4_POUT:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].status[PSU_POUT0] |
                     (u32)data->ipmi_resp[pid].status[PSU_POUT1] << 8  |
@@ -750,6 +813,8 @@ static ssize_t show_psu(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_TEMP1_INPUT:
     case PSU2_TEMP1_INPUT:
+    case PSU3_TEMP1_INPUT:
+    case PSU4_TEMP1_INPUT:
         VALIDATE_PRESENT_RETURN(pid);
         value = (s16)((u16)data->ipmi_resp[pid].status[PSU_TEMP1_0] |
                       (u16)data->ipmi_resp[pid].status[PSU_TEMP1_1] << 8);
@@ -757,6 +822,8 @@ static ssize_t show_psu(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_TEMP2_INPUT:
     case PSU2_TEMP2_INPUT:
+    case PSU3_TEMP2_INPUT:
+    case PSU4_TEMP2_INPUT:
         VALIDATE_PRESENT_RETURN(pid);
         value = (s16)((u16)data->ipmi_resp[pid].status[PSU_TEMP2_0] |
                       (u16)data->ipmi_resp[pid].status[PSU_TEMP2_1] << 8);
@@ -764,6 +831,8 @@ static ssize_t show_psu(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_TEMP3_INPUT:
     case PSU2_TEMP3_INPUT:
+    case PSU3_TEMP3_INPUT:
+    case PSU4_TEMP3_INPUT:
         VALIDATE_PRESENT_RETURN(pid);
         value = (s16)((u16)data->ipmi_resp[pid].status[PSU_TEMP3_0] |
                       (u16)data->ipmi_resp[pid].status[PSU_TEMP3_1] << 8);
@@ -771,6 +840,8 @@ static ssize_t show_psu(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_FAN_INPUT:
     case PSU2_FAN_INPUT:
+    case PSU3_FAN_INPUT:
+    case PSU4_FAN_INPUT:
         VALIDATE_PRESENT_RETURN(pid);
         multiplier = 1;
         value = ((u32)data->ipmi_resp[pid].status[PSU_FAN0] |
@@ -812,6 +883,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
     switch (attr->index) {
     case PSU1_TEMP1_INPUT_MAX:
     case PSU2_TEMP1_INPUT_MAX:
+    case PSU3_TEMP1_INPUT_MAX:
+    case PSU4_TEMP1_INPUT_MAX:
         VALIDATE_PRESENT_RETURN(pid);
         value = (s16)((u16)data->ipmi_resp[pid].info[PSU_TEMP1_MAX0] |
                       (u16)data->ipmi_resp[pid].info[PSU_TEMP1_MAX1] << 8);
@@ -819,6 +892,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_TEMP1_INPUT_MIN:
     case PSU2_TEMP1_INPUT_MIN:
+    case PSU3_TEMP1_INPUT_MIN:
+    case PSU4_TEMP1_INPUT_MIN:
         VALIDATE_PRESENT_RETURN(pid);
         value = (s16)((u16)data->ipmi_resp[pid].info[PSU_TEMP1_MIN0] |
                       (u16)data->ipmi_resp[pid].info[PSU_TEMP1_MIN1] << 8);
@@ -826,6 +901,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_TEMP2_INPUT_MAX:
     case PSU2_TEMP2_INPUT_MAX:
+    case PSU3_TEMP2_INPUT_MAX:
+    case PSU4_TEMP2_INPUT_MAX:
         VALIDATE_PRESENT_RETURN(pid);
         value = (s16)((u16)data->ipmi_resp[pid].info[PSU_TEMP2_MAX0] |
                       (u16)data->ipmi_resp[pid].info[PSU_TEMP2_MAX1] << 8);
@@ -833,6 +910,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_TEMP2_INPUT_MIN:
     case PSU2_TEMP2_INPUT_MIN:
+    case PSU3_TEMP2_INPUT_MIN:
+    case PSU4_TEMP2_INPUT_MIN:
         VALIDATE_PRESENT_RETURN(pid);
         value = (s16)((u16)data->ipmi_resp[pid].info[PSU_TEMP2_MIN0] |
                       (u16)data->ipmi_resp[pid].info[PSU_TEMP2_MIN1] << 8);
@@ -840,6 +919,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_TEMP3_INPUT_MAX:
     case PSU2_TEMP3_INPUT_MAX:
+    case PSU3_TEMP3_INPUT_MAX:
+    case PSU4_TEMP3_INPUT_MAX:
         VALIDATE_PRESENT_RETURN(pid);
         value = (s16)((u16)data->ipmi_resp[pid].info[PSU_TEMP3_MAX0] |
                       (u16)data->ipmi_resp[pid].info[PSU_TEMP3_MAX1] << 8);
@@ -847,6 +928,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_TEMP3_INPUT_MIN:
     case PSU2_TEMP3_INPUT_MIN:
+    case PSU3_TEMP3_INPUT_MIN:
+    case PSU4_TEMP3_INPUT_MIN:
         VALIDATE_PRESENT_RETURN(pid);
         value = (s16)((u16)data->ipmi_resp[pid].info[PSU_TEMP3_MIN0] |
                       (u16)data->ipmi_resp[pid].info[PSU_TEMP3_MIN1] << 8);
@@ -854,6 +937,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_VIN_UPPER_CRIT:
     case PSU2_VIN_UPPER_CRIT:
+    case PSU3_VIN_UPPER_CRIT:
+    case PSU4_VIN_UPPER_CRIT:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].info[PSU_VIN_UPPER_CRIT0] |
                 (u32)data->ipmi_resp[pid].info[PSU_VIN_UPPER_CRIT1] << 8 |
@@ -861,6 +946,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_VIN_LOWER_CRIT:
     case PSU2_VIN_LOWER_CRIT:
+    case PSU3_VIN_LOWER_CRIT:
+    case PSU4_VIN_LOWER_CRIT:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].info[PSU_VIN_LOWER_CRIT0] |
                 (u32)data->ipmi_resp[pid].info[PSU_VIN_LOWER_CRIT1] << 8 |
@@ -868,6 +955,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_VIN_MAX:
     case PSU2_VIN_MAX:
+    case PSU3_VIN_MAX:
+    case PSU4_VIN_MAX:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].info[PSU_VIN_MAX0] |
                 (u32)data->ipmi_resp[pid].info[PSU_VIN_MAX1] << 8 |
@@ -875,6 +964,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_VIN_MIN:
     case PSU2_VIN_MIN:
+    case PSU3_VIN_MIN:
+    case PSU4_VIN_MIN:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].info[PSU_VIN_MIN0] |
                 (u32)data->ipmi_resp[pid].info[PSU_VIN_MIN1] << 8 |
@@ -882,6 +973,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_VOUT_MAX:
     case PSU2_VOUT_MAX:
+    case PSU3_VOUT_MAX:
+    case PSU4_VOUT_MAX:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].info[PSU_VOUT_MAX0] |
                 (u32)data->ipmi_resp[pid].info[PSU_VOUT_MAX1] << 8 |
@@ -889,6 +982,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_VOUT_MIN:
     case PSU2_VOUT_MIN:
+    case PSU3_VOUT_MIN:
+    case PSU4_VOUT_MIN:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].info[PSU_VOUT_MIN0] |
                 (u32)data->ipmi_resp[pid].info[PSU_VOUT_MIN1] << 8 |
@@ -896,6 +991,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_IIN_MAX:
     case PSU2_IIN_MAX:
+    case PSU3_IIN_MAX:
+    case PSU4_IIN_MAX:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].info[PSU_IIN_MAX0] |
                 (u32)data->ipmi_resp[pid].info[PSU_IIN_MAX1] << 8 |
@@ -903,6 +1000,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_IOUT_MAX:
     case PSU2_IOUT_MAX:
+    case PSU3_IOUT_MAX:
+    case PSU4_IOUT_MAX:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].info[PSU_IOUT_MAX0] |
                 (u32)data->ipmi_resp[pid].info[PSU_IOUT_MAX1] << 8 |
@@ -910,6 +1009,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_PIN_MAX:
     case PSU2_PIN_MAX:
+    case PSU3_PIN_MAX:
+    case PSU4_PIN_MAX:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].info[PSU_PIN_MAX0] |
                 (u32)data->ipmi_resp[pid].info[PSU_PIN_MAX1] << 8  |
@@ -919,6 +1020,8 @@ static ssize_t show_psu_info(struct device *dev, struct device_attribute *da,
         break;
     case PSU1_POUT_MAX:
     case PSU2_POUT_MAX:
+    case PSU3_POUT_MAX:
+    case PSU4_POUT_MAX:
         VALIDATE_PRESENT_RETURN(pid);
         value = ((u32)data->ipmi_resp[pid].info[PSU_POUT_MAX0] |
                 (u32)data->ipmi_resp[pid].info[PSU_POUT_MAX1] << 8  |
@@ -959,16 +1062,22 @@ static ssize_t show_string(struct device *dev, struct device_attribute *da,
     switch (attr->index) {
     case PSU1_MODEL:
     case PSU2_MODEL:
+    case PSU3_MODEL:
+    case PSU4_MODEL:
         VALIDATE_PRESENT_RETURN(pid);
         str = data->ipmi_resp[pid].model;
         break;
     case PSU1_SERIAL:
     case PSU2_SERIAL:
+    case PSU3_SERIAL:
+    case PSU4_SERIAL:
         VALIDATE_PRESENT_RETURN(pid);
         str = data->ipmi_resp[pid].serial;
         break;
     case PSU1_FAN_DIR:
     case PSU2_FAN_DIR:
+    case PSU3_FAN_DIR:
+    case PSU4_FAN_DIR:
         VALIDATE_PRESENT_RETURN(pid);
         str = data->ipmi_resp[pid].fandir;
         break;

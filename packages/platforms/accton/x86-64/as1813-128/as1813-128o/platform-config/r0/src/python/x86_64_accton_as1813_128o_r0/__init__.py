@@ -83,19 +83,10 @@ class OnlPlatform_x86_64_accton_as1813_128o_r0(OnlPlatformAccton,
         self.modprobe('optoe')
         self.modprobe('at24')
 
-        for m in [ 'i2c-ocores', 'fpga', 'mux', 'fan', 'psu', 'thermal', 'sys', 'leds' ]:
+        for m in [ 'i2c-ocores', 'fpga', 'fan', 'psu', 'thermal', 'sys', 'leds' ]:
             self.insmod("x86-64-accton-as1813-128-%s" % m)
 
         ########### initialize I2C bus 0 ###########
-        self.new_i2c_devices(
-            [
-                # initialize multiplexer (PCA9548)
-                ('as1813_128_mux', 0x78, 0),
-
-                # initiate IDPROM
-                ('24c02', 0x56, 67),
-                ]
-            )
 
         # initialize SFP devices
         for port in range(1, 65):

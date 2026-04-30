@@ -36,8 +36,18 @@ enum fan_id {
     FAN_6_ON_FAN_BOARD,
     FAN_7_ON_FAN_BOARD,
     FAN_8_ON_FAN_BOARD,
+    FAN_9_ON_FAN_BOARD,
+    FAN_10_ON_FAN_BOARD,
+    FAN_11_ON_FAN_BOARD,
+    FAN_12_ON_FAN_BOARD,
+    FAN_13_ON_FAN_BOARD,
+    FAN_14_ON_FAN_BOARD,
+    FAN_15_ON_FAN_BOARD,
+    FAN_16_ON_FAN_BOARD,
     FAN_1_ON_PSU_1,
-    FAN_1_ON_PSU_2
+    FAN_1_ON_PSU_2,
+    FAN_1_ON_PSU_3,
+    FAN_1_ON_PSU_4
 };
 
 #define MAX_PSU_FAN_SPEED 25500
@@ -73,8 +83,18 @@ onlp_fan_info_t finfo[] = {
     CHASSIS_FAN_INFO(6),
     CHASSIS_FAN_INFO(7),
     CHASSIS_FAN_INFO(8),
+    CHASSIS_FAN_INFO(9),
+    CHASSIS_FAN_INFO(10),
+    CHASSIS_FAN_INFO(11),
+    CHASSIS_FAN_INFO(12),
+    CHASSIS_FAN_INFO(13),
+    CHASSIS_FAN_INFO(14),
+    CHASSIS_FAN_INFO(15),
+    CHASSIS_FAN_INFO(16),
     PSU_FAN_INFO(1,1),
-    PSU_FAN_INFO(2,1)
+    PSU_FAN_INFO(2,1),
+    PSU_FAN_INFO(3,1),
+    PSU_FAN_INFO(4,1)
 };
 
 #define VALIDATE(_id)                           \
@@ -232,11 +252,21 @@ onlp_fani_info_get(onlp_oid_t id, onlp_fan_info_t* info)
         case FAN_6_ON_FAN_BOARD:
         case FAN_7_ON_FAN_BOARD:
         case FAN_8_ON_FAN_BOARD:
+        case FAN_9_ON_FAN_BOARD:
+        case FAN_10_ON_FAN_BOARD:
+        case FAN_11_ON_FAN_BOARD:
+        case FAN_12_ON_FAN_BOARD:
+        case FAN_13_ON_FAN_BOARD:
+        case FAN_14_ON_FAN_BOARD:
+        case FAN_15_ON_FAN_BOARD:
+        case FAN_16_ON_FAN_BOARD:
             rc = _onlp_fani_info_get_fan(fid, info);
             break;
         case FAN_1_ON_PSU_1:
         case FAN_1_ON_PSU_2:
-            rc = _onlp_fani_info_get_fan_on_psu(fid-FAN_8_ON_FAN_BOARD, info);
+        case FAN_1_ON_PSU_3:
+        case FAN_1_ON_PSU_4:
+            rc = _onlp_fani_info_get_fan_on_psu(fid-FAN_16_ON_FAN_BOARD, info);
             break;
         default:
             rc = ONLP_STATUS_E_INVALID;
@@ -263,7 +293,7 @@ onlp_fani_percentage_set(onlp_oid_t id, int p)
 
     fid = ONLP_OID_ID_GET(id);
 
-    if (fid < FAN_1_ON_FAN_BOARD || fid > FAN_8_ON_FAN_BOARD) {
+    if (fid < FAN_1_ON_FAN_BOARD || fid > FAN_16_ON_FAN_BOARD) {
         return ONLP_STATUS_E_UNSUPPORTED;
     }
 

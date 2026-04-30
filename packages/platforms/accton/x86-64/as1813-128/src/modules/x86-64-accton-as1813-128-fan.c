@@ -68,6 +68,14 @@ enum fan_id {
     FAN_6,
     FAN_7,
     FAN_8,
+    FAN_9,
+    FAN_10,
+    FAN_11,
+    FAN_12,
+    FAN_13,
+    FAN_14,
+    FAN_15,
+    FAN_16,
     NUM_OF_FAN,
     NUM_OF_FAN_MODULE = NUM_OF_FAN
 };
@@ -155,6 +163,14 @@ enum as1813_128_fan_sysfs_attrs {
     FAN_ATTR(6),
     FAN_ATTR(7),
     FAN_ATTR(8),
+    FAN_ATTR(9),
+    FAN_ATTR(10),
+    FAN_ATTR(11),
+    FAN_ATTR(12),
+    FAN_ATTR(13),
+    FAN_ATTR(14),
+    FAN_ATTR(15),
+    FAN_ATTR(16),
     NUM_OF_FAN_ATTR,
     FAN_VERSION,
     FAN_MAX_RPM,
@@ -166,7 +182,15 @@ enum as1813_128_fan_sysfs_attrs {
     FAN_RPM_THRESHOLD_ATTR(5),
     FAN_RPM_THRESHOLD_ATTR(6),
     FAN_RPM_THRESHOLD_ATTR(7),
-    FAN_RPM_THRESHOLD_ATTR(8)
+    FAN_RPM_THRESHOLD_ATTR(8),
+    FAN_RPM_THRESHOLD_ATTR(9),
+    FAN_RPM_THRESHOLD_ATTR(10),
+    FAN_RPM_THRESHOLD_ATTR(11),
+    FAN_RPM_THRESHOLD_ATTR(12),
+    FAN_RPM_THRESHOLD_ATTR(13),
+    FAN_RPM_THRESHOLD_ATTR(14),
+    FAN_RPM_THRESHOLD_ATTR(15),
+    FAN_RPM_THRESHOLD_ATTR(16)
 };
 
 /* fan attributes */
@@ -213,6 +237,14 @@ DECLARE_FAN_SENSOR_DEVICE_ATTR(5);
 DECLARE_FAN_SENSOR_DEVICE_ATTR(6);
 DECLARE_FAN_SENSOR_DEVICE_ATTR(7);
 DECLARE_FAN_SENSOR_DEVICE_ATTR(8);
+DECLARE_FAN_SENSOR_DEVICE_ATTR(9);
+DECLARE_FAN_SENSOR_DEVICE_ATTR(10);
+DECLARE_FAN_SENSOR_DEVICE_ATTR(11);
+DECLARE_FAN_SENSOR_DEVICE_ATTR(12);
+DECLARE_FAN_SENSOR_DEVICE_ATTR(13);
+DECLARE_FAN_SENSOR_DEVICE_ATTR(14);
+DECLARE_FAN_SENSOR_DEVICE_ATTR(15);
+DECLARE_FAN_SENSOR_DEVICE_ATTR(16);
 DECLARE_FAN_VER_SENSOR_DEVICE_ATTR();
 
 static struct attribute *as1813_128_fan_attrs[] = {
@@ -225,6 +257,14 @@ static struct attribute *as1813_128_fan_attrs[] = {
     DECLARE_FAN_ATTR(6),
     DECLARE_FAN_ATTR(7),
     DECLARE_FAN_ATTR(8),
+    DECLARE_FAN_ATTR(9),
+    DECLARE_FAN_ATTR(10),
+    DECLARE_FAN_ATTR(11),
+    DECLARE_FAN_ATTR(12),
+    DECLARE_FAN_ATTR(13),
+    DECLARE_FAN_ATTR(14),
+    DECLARE_FAN_ATTR(15),
+    DECLARE_FAN_ATTR(16),
     DECLARE_FAN_VER_ATTR(),
     DECLARE_FAN_MAX_RPM_ATTR(),
     NULL
@@ -449,6 +489,14 @@ static ssize_t show_fan(struct device *dev, struct device_attribute *da,
     case FAN6_PRESENT:
     case FAN7_PRESENT:
     case FAN8_PRESENT:
+    case FAN9_PRESENT:
+    case FAN10_PRESENT:
+    case FAN11_PRESENT:
+    case FAN12_PRESENT:
+    case FAN13_PRESENT:
+    case FAN14_PRESENT:
+    case FAN15_PRESENT:
+    case FAN16_PRESENT:
         value = present;
         break;
     case FAN1_PWM:
@@ -459,6 +507,14 @@ static ssize_t show_fan(struct device *dev, struct device_attribute *da,
     case FAN6_PWM:
     case FAN7_PWM:
     case FAN8_PWM:
+    case FAN9_PWM:
+    case FAN10_PWM:
+    case FAN11_PWM:
+    case FAN12_PWM:
+    case FAN13_PWM:
+    case FAN14_PWM:
+    case FAN15_PWM:
+    case FAN16_PWM:
         index = (fid % NUM_OF_FAN_MODULE) * FAN_DATA_COUNT;
         value = DIV_ROUND_CLOSEST(data->ipmi_resp[index + FAN_PWM] * 666, 100);
         break;
@@ -470,6 +526,14 @@ static ssize_t show_fan(struct device *dev, struct device_attribute *da,
     case FAN6_INPUT:
     case FAN7_INPUT:
     case FAN8_INPUT:
+    case FAN9_INPUT:
+    case FAN10_INPUT:
+    case FAN11_INPUT:
+    case FAN12_INPUT:
+    case FAN13_INPUT:
+    case FAN14_INPUT:
+    case FAN15_INPUT:
+    case FAN16_INPUT:
         value = (int)data->ipmi_resp[index + FAN_SPEED0] |
                 (int)data->ipmi_resp[index + FAN_SPEED1] << 8;
         break;
@@ -481,6 +545,14 @@ static ssize_t show_fan(struct device *dev, struct device_attribute *da,
     case FAN6_FAULT:
     case FAN7_FAULT:
     case FAN8_FAULT:
+    case FAN9_FAULT:
+    case FAN10_FAULT:
+    case FAN11_FAULT:
+    case FAN12_FAULT:
+    case FAN13_FAULT:
+    case FAN14_FAULT:
+    case FAN15_FAULT:
+    case FAN16_FAULT:
         value = (int)data->ipmi_resp[index + FAN_SPEED0] |
                 (int)data->ipmi_resp[index + FAN_SPEED1] << 8;
         value = !value;
@@ -658,6 +730,14 @@ static ssize_t show_threshold(struct device *dev, struct device_attribute *da,
     case FAN6_TARGET:
     case FAN7_TARGET:
     case FAN8_TARGET:
+    case FAN9_TARGET:
+    case FAN10_TARGET:
+    case FAN11_TARGET:
+    case FAN12_TARGET:
+    case FAN13_TARGET:
+    case FAN14_TARGET:
+    case FAN15_TARGET:
+    case FAN16_TARGET:
         value = (int)data->ipmi_resp_speed[FAN_TARGET_SPEED0] |
                 (int)data->ipmi_resp_speed[FAN_TARGET_SPEED1] << 8;
         break;
@@ -669,6 +749,14 @@ static ssize_t show_threshold(struct device *dev, struct device_attribute *da,
     case FAN6_TOLERANCE:
     case FAN7_TOLERANCE:
     case FAN8_TOLERANCE:
+    case FAN9_TOLERANCE:
+    case FAN10_TOLERANCE:
+    case FAN11_TOLERANCE:
+    case FAN12_TOLERANCE:
+    case FAN13_TOLERANCE:
+    case FAN14_TOLERANCE:
+    case FAN15_TOLERANCE:
+    case FAN16_TOLERANCE:
         value = (int)data->ipmi_resp_speed[FAN_SPEED_TOLERANCE];
         break;
     default:
@@ -767,7 +855,7 @@ static void __exit as1813_128_fan_exit(void)
     platform_driver_unregister(&as1813_128_fan_driver);
 }
 
-MODULE_AUTHOR("Roger Ho <roger530_ho@edge-core.com>");
+MODULE_AUTHOR("Eric Yang <eric_yang@accton.com>");
 MODULE_DESCRIPTION("as1813_128_fan driver");
 MODULE_LICENSE("GPL");
 
