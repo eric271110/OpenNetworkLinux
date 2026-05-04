@@ -101,7 +101,7 @@ static unsigned int timeout = 1;
 module_param(timeout , uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(timeout, "Tiemout for ocores_poll_wait, in unit of milliseconds.");
 
-static unsigned int debug = 0;
+static unsigned int debug = 1;
 module_param(debug , uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(debug, "Enable or disable debug message. 1 -> enable, 0 -> disable");
 
@@ -307,44 +307,33 @@ static const int port_mux[PORT_NUM]= {
 };
 
 int wait_spi(u32 mask, u8 times) {
-    u32 data;
-    u32 spi_busy_flag = 0;
-    u8 max_times = 0;
-    max_times = times;
-    /* pr_info("CPLD %u, Will time-out at jiffie %lu\n", cpld_id,timeout); */
-    if (!spi_busy_reg) {
-        return -EFAULT;
-    }
+	u32 data;
+	u32 ri = 0;
+	unsigned long j;
 
-    while(max_times) {
-        data = ioread32(spi_busy_reg);
-        /* pr_info("@ %u, Read spi_busy_reg: 0x%08x 0x%08x\n", ri, data, mask); */
-        if (!((( data >> 24) & 0xFF) & mask))
-        {
-            /* spi flag is normal*/
-            if (spi_busy_flag)
-                break;
-        }
-        else
-        {
-            spi_busy_flag = 1;
-        }
+	/* pr_info("CPLD %u, Will time-out at jiffie %lu\n", cpld_id,times); */
+	if (!spi_busy_reg) {
+		return -EFAULT;
+	}
 
-        usleep_range(10, 11);
-        max_times--;
+	j = jiffies + times;
+	while (1) {
+		data = ioread8(spi_busy_reg);
+		if (!(((data) & 0xFF) & mask)) {
+			break;
+		}
 
-        if(max_times == 0)
-        {
-            if(!spi_busy_flag)
-                break;
-            if (debug) {
-                pr_warn("spi_busy_flag %d as max_times is 0 \n", spi_busy_flag);
-            }
-            return -ETIMEDOUT;
-        }
-    }
+		if (time_after(jiffies, j)) {
+			if (debug) {
+				pr_warn("@ %u, wait_spi TIMEOUT \n", ri);
+			}
+			return -ETIMEDOUT;
+		}
 
-    return 0;
+		ri++;
+	}
+
+	return 0;
 }
 EXPORT_SYMBOL(wait_spi);
 
@@ -951,10 +940,17 @@ static int ocores_i2c_probe(struct platform_device *pdev)
 
     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
     if (res) {
-        i2c->base = devm_ioremap_resource(&pdev->dev, res);
+        /*
+         * Use devm_ioremap() instead of devm_ioremap_resource() because
+         * multiple ocores platform devices share the same physical FPGA
+         * I2C master registers (differentiated by SPI mux selection).
+         * devm_ioremap_resource() requests exclusive access which fails
+         * with -EBUSY when a second device tries to map the same region.
+         */
+        i2c->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
         dev_info(&pdev->dev, "Resouce start:0x%llx, end:0x%llx", res->start, res->end);
-        if (IS_ERR(i2c->base))
-            return PTR_ERR(i2c->base);
+        if (!i2c->base)
+            return -ENOMEM;
     } else {
         res = platform_get_resource(pdev, IORESOURCE_IO, 0);
         if (!res)
@@ -1019,7 +1015,6 @@ static int ocores_i2c_probe(struct platform_device *pdev)
 
     init_waitqueue_head(&i2c->wait);
 
-    //irq = platform_get_irq_optional(pdev, 0);
     irq = platform_get_irq(pdev, 0);
     if (irq == -ENXIO) {
         ocores_algorithm.master_xfer = ocores_xfer_polling;

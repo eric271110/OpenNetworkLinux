@@ -11,7 +11,7 @@ static int
 datatypes_init__(void)
 {
 #define x86_64_accton_as1813_128o_ENUMERATION_ENTRY(_enum_name, _desc)     AIM_DATATYPE_MAP_REGISTER(_enum_name, _enum_name##_map, _desc,                               AIM_LOG_INTERNAL);
-#include <x86_64_accton_as1813_128o/x86_64_accton_as1813_128.x>
+#include <x86_64_accton_as1813_128o/x86_64_accton_as1813_128o.x>
     return 0;
 }
 

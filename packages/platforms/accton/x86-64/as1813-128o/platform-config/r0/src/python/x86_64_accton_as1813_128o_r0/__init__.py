@@ -83,17 +83,18 @@ class OnlPlatform_x86_64_accton_as1813_128o_r0(OnlPlatformAccton,
         self.modprobe('optoe')
         self.modprobe('at24')
 
-        for m in [ 'i2c-ocores', 'fpga', 'fan', 'psu', 'thermal', 'sys', 'leds' ]:
-            self.insmod("x86-64-accton-as1813-128-%s" % m)
+        #for m in [ 'i2c-ocores', 'fpga', 'fan', 'psu', 'thermal', 'sys', 'leds' ]:
+        for m in [ 'i2c-ocores', 'fpga' ]:
+            self.insmod("x86-64-accton-as1813-128o-%s" % m)
 
         ########### initialize I2C bus 0 ###########
 
         # initialize SFP devices
         for port in range(1, 129):
-            subprocess.call('echo 0 > /sys/devices/platform/as1813_128_fpga/module_reset_%d' % (port), shell=True)
+            subprocess.call('echo 0 > /sys/devices/platform/as1813_128o_fpga/module_reset_%d' % (port), shell=True)
 
         sfp_bus = [
-              1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,
+              0, 1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,
              17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32,
              33,  34,  35,  36,  37,  38,  39,  40,  41,  42,  43,  44,  45,  46,  47,  48,
              49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64,
@@ -101,11 +102,11 @@ class OnlPlatform_x86_64_accton_as1813_128o_r0(OnlPlatformAccton,
              81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,  96,
              97,  98,  99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112,
             113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128,
-            129, 130
+            129
         ]
 
         for port in range(1, len(sfp_bus)+1):
-            self.new_i2c_device('optoe3' if (port <= 128) else 'optoe2', 0x50, sfp_bus[port-1])
+            self.new_i2c_device('optoe3' if (port <= 127) else 'optoe2', 0x50, sfp_bus[port-1])
             subprocess.call('echo port%d > /sys/bus/i2c/devices/%d-0050/port_name' % (port, sfp_bus[port-1]), shell=True)
 
         return True

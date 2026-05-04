@@ -173,7 +173,6 @@ enum as1813_128o_fan_sysfs_attrs {
     FAN_ATTR(16),
     NUM_OF_FAN_ATTR,
     FAN_VERSION,
-    FAN_MAX_RPM,
     NUM_OF_PER_FAN_ATTR = (NUM_OF_FAN_ATTR/NUM_OF_FAN),
     FAN_RPM_THRESHOLD_ATTR(1),
     FAN_RPM_THRESHOLD_ATTR(2),
@@ -214,11 +213,6 @@ enum as1813_128o_fan_sysfs_attrs {
                                 NULL, FAN##index##_TARGET); \
     static SENSOR_DEVICE_ATTR(fan##index##_tolerance, S_IRUGO, show_threshold,\
                                 NULL, FAN##index##_TOLERANCE)
-
-static SENSOR_DEVICE_ATTR(fan_max_speed_rpm, S_IRUGO, show_fan, NULL, \
-            FAN_MAX_RPM);
-#define DECLARE_FAN_MAX_RPM_ATTR(index) \
-            &sensor_dev_attr_fan_max_speed_rpm.dev_attr.attr
 
 #define DECLARE_FAN_ATTR(index) \
     &sensor_dev_attr_fan##index##_present.dev_attr.attr, \
@@ -266,7 +260,6 @@ static struct attribute *as1813_128o_fan_attrs[] = {
     DECLARE_FAN_ATTR(15),
     DECLARE_FAN_ATTR(16),
     DECLARE_FAN_VER_ATTR(),
-    DECLARE_FAN_MAX_RPM_ATTR(),
     NULL
 };
 ATTRIBUTE_GROUPS(as1813_128o_fan);
@@ -465,9 +458,6 @@ static ssize_t show_fan(struct device *dev, struct device_attribute *da,
     int index = 0;
     int present = 0;
     int error = 0;
-
-    if (attr->index == FAN_MAX_RPM)
-        return sprintf(buf, "%d\n", MAX_FAN_SPEED_RPM);
 
     mutex_lock(&data->update_lock);
 

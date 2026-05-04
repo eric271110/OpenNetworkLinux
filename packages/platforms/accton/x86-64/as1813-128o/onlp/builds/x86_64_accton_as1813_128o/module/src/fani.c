@@ -50,7 +50,10 @@ enum fan_id {
     FAN_1_ON_PSU_4
 };
 
-#define MAX_PSU_FAN_SPEED 25500 //eric_test?
+#define MAX_PSU_FAN_SPEED 35000
+
+#define MAX_FAN_FRONT_SPEED 15400
+#define MAX_FAN_REAR_SPEED 13600
 
 #define CHASSIS_FAN_INFO(fid) \
     { \
@@ -124,7 +127,7 @@ _onlp_fani_set_fan_dir_info(int fid, onlp_fan_info_t* info)
 static int
 _onlp_fani_info_get_fan(int fid, onlp_fan_info_t* info)
 {
-    int value, ret, pwm;
+    int value, ret;
 
     /* get fan present status
      */
@@ -160,19 +163,12 @@ _onlp_fani_info_get_fan(int fid, onlp_fan_info_t* info)
 
     /* get speed percentage from rpm
      */
-    pwm = 0;
-    ret = onlp_file_read_int(&pwm, "%s""fan%d_pwm", FAN_SYSFS_FORMAT, fid);
-    if (ret < 0) {
-        return ONLP_STATUS_E_INTERNAL;
-    }
 
-    value = 0;
-    ret = onlp_file_read_int(&value, "%s""fan%d_target", FAN_SYSFS_FORMAT, fid);
-    if (ret < 0 || value == 0) {
-        return ONLP_STATUS_E_INTERNAL;
-    }
+    if(fid <= FAN_8_ON_FAN_BOARD)
+        info->percentage = (info->rpm*100)/MAX_FAN_FRONT_SPEED;
+    else
+        info->percentage = (info->rpm*100)/MAX_FAN_REAR_SPEED;
 
-    info->percentage = (info->rpm*pwm)/value;
     if (info->percentage > 100)
         info->percentage = 100;
 

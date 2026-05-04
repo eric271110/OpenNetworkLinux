@@ -33,6 +33,10 @@
 #include <linux/string_helpers.h>
 
 #define DRVNAME "as1813_128o_sys"
+#define ACCTON_IPMI_NETFN 0x34
+
+#define IPMI_TIMEOUT (5 * HZ)
+#define IPMI_ERR_RETRY_TIMES 1
 #define IPMI_SYSEEPROM_READ_CMD 0x18
 #define IPMI_READ_MAX_LEN       128
 
@@ -47,6 +51,7 @@
 #define IPMI_CPLD_MB_CPLD0_CMD         0x62
 #define IPMI_CPLD_MB_CPLD1_CMD         0x63
 
+static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data);
 static int as1813_128o_sys_probe(struct platform_device *pdev);
 static int as1813_128o_sys_remove(struct platform_device *pdev);
 static ssize_t show_cpld_version(struct device *dev, struct device_attribute *da, char *buf);

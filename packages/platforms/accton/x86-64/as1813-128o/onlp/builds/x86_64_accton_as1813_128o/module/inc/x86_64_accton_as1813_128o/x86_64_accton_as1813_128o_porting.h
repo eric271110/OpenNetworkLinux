@@ -33,7 +33,7 @@
 #ifndef X86_64_ACCTON_AS1813_128O_FREE
     #if defined(GLOBAL_FREE)
         #define X86_64_ACCTON_AS1813_128O_FREE GLOBAL_FREE
-    #elif X86_64_ACCTON_AS1813_128_CONFIG_PORTING_STDLIB == 1
+    #elif X86_64_ACCTON_AS1813_128O_CONFIG_PORTING_STDLIB == 1
         #define X86_64_ACCTON_AS1813_128O_FREE free
     #else
         #error The macro X86_64_ACCTON_AS1813_128O_FREE is required but cannot be defined.
@@ -63,7 +63,7 @@
 #ifndef X86_64_ACCTON_AS1813_128O_STRNCPY
     #if defined(GLOBAL_STRNCPY)
         #define X86_64_ACCTON_AS1813_128O_STRNCPY GLOBAL_STRNCPY
-    #elif X86_64_ACCTON_AS1813_128_CONFIG_PORTING_STDLIB == 1
+    #elif X86_64_ACCTON_AS1813_128O_CONFIG_PORTING_STDLIB == 1
         #define X86_64_ACCTON_AS1813_128O_STRNCPY strncpy
     #else
         #error The macro X86_64_ACCTON_AS1813_128O_STRNCPY is required but cannot be defined.
@@ -73,7 +73,7 @@
 #ifndef X86_64_ACCTON_AS1813_128O_VSNPRINTF
     #if defined(GLOBAL_VSNPRINTF)
         #define X86_64_ACCTON_AS1813_128O_VSNPRINTF GLOBAL_VSNPRINTF
-    #elif X86_64_ACCTON_AS1813_128_CONFIG_PORTING_STDLIB == 1
+    #elif X86_64_ACCTON_AS1813_128O_CONFIG_PORTING_STDLIB == 1
         #define X86_64_ACCTON_AS1813_128O_VSNPRINTF vsnprintf
     #else
         #error The macro X86_64_ACCTON_AS1813_128O_VSNPRINTF is required but cannot be defined.
@@ -93,7 +93,7 @@
 #ifndef X86_64_ACCTON_AS1813_128O_STRLEN
     #if defined(GLOBAL_STRLEN)
         #define X86_64_ACCTON_AS1813_128O_STRLEN GLOBAL_STRLEN
-    #elif X86_64_ACCTON_AS1813_128_CONFIG_PORTING_STDLIB == 1
+    #elif X86_64_ACCTON_AS1813_128O_CONFIG_PORTING_STDLIB == 1
         #define X86_64_ACCTON_AS1813_128O_STRLEN strlen
     #else
         #error The macro X86_64_ACCTON_AS1813_128O_STRLEN is required but cannot be defined.

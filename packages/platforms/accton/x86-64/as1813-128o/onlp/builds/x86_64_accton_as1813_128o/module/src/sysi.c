@@ -51,12 +51,12 @@ enum fan_duty_level {
     FAN_DUTY_MAX = 100
 };
 
-// enum temp_sensors {
-//     TEMP_SENSOR_CPU = 0,
-//     TEMP_SENSOR_MAC,
-//     TEMP_SENSOR_XCVR,
-//     TEMP_SENSOR_COUNT
-// };
+enum temp_sensors {
+    TEMP_SENSOR_CPU = 0,
+    TEMP_SENSOR_MAC,
+    TEMP_SENSOR_XCVR,
+    TEMP_SENSOR_COUNT
+};
 
 typedef struct temp_threshold {
     int idle;
@@ -149,22 +149,22 @@ onlp_sysi_oids_get(onlp_oid_t* table, int max)
     onlp_oid_t* e = table;
     memset(table, 0, max*sizeof(onlp_oid_t));
 
-    /* 7 Thermal sensors on the chassis */
+    /* 16 Thermal sensors on the chassis */
     for (i = 1; i <= CHASSIS_THERMAL_COUNT; i++) {
         *e++ = ONLP_THERMAL_ID_CREATE(i);
     }
 
-    /* 6 LEDs on the chassis */
+    /* 5 LEDs on the chassis */
     for (i = 1; i <= CHASSIS_LED_COUNT; i++) {
         *e++ = ONLP_LED_ID_CREATE(i);
     }
 
-    /* 2 PSUs on the chassis */
+    /* 4 PSUs on the chassis */
     for (i = 1; i <= CHASSIS_PSU_COUNT; i++) {
         *e++ = ONLP_PSU_ID_CREATE(i);
     }
 
-    /* 10 Fans on the chassis */
+    /* 16 Fans on the chassis */
     for (i = 1; i <= CHASSIS_FAN_COUNT; i++) {
         *e++ = ONLP_FAN_ID_CREATE(i);
     }
@@ -393,7 +393,7 @@ onlp_sysi_platform_info_free(onlp_platform_info_t* pi)
 //                     "Alarm for temperature critical is detected; performing OTP protect action!");
 //     system("sync;sync;sync");
 //     onlp_sysi_reset_front_port();
-//     onlp_file_write_int(1, "/sys/devices/platform/as1813_128_sys/otp_protect");
+//     onlp_file_write_int(1, "/sys/devices/platform/as1813_128o_sys/otp_protect");
 //     return ONLP_STATUS_OK;
 // }
 
