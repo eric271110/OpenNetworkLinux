@@ -35,86 +35,10 @@
 #include "x86_64_accton_as1813_128o_int.h"
 #include "x86_64_accton_as1813_128o_log.h"
 
-#define NUM_OF_CPLD_VER 4 //eric_test?
-#define NUM_OF_QSFP_PORT 128
-
-// int onlp_sysi_get_cpu_temp(int *temp);
-// int onlp_sysi_get_mac_temp(int *temp);
-// int onlp_sysi_get_xcvr_temp(int *temp);
-// int onlp_sysi_over_temp_protector(void);
-// int onlp_sysi_set_fan_duty_all(int duty);
-// int onlp_sysi_get_fan_status(void);
-
-enum fan_duty_level {
-    FAN_DUTY_MIN = 30,
-    FAN_DUTY_MID = 60,
-    FAN_DUTY_MAX = 100
-};
-
-enum temp_sensors {
-    TEMP_SENSOR_CPU = 0,
-    TEMP_SENSOR_MAC,
-    TEMP_SENSOR_XCVR,
-    TEMP_SENSOR_COUNT
-};
-
-typedef struct temp_threshold {
-    int idle;
-    int up_adjust;
-    int down_adjust;
-    int otp;
-} temp_threshold_t;
-
-typedef int (*temp_getter_t)(int *temp);
-typedef int (*fan_pwm_setter_t)(int pwm);
-typedef int (*fan_status_getter_t)(void);
-typedef int (*ot_protector_t)(void);
-
-typedef struct temp_handler {
-    temp_getter_t    temp_readers[TEMP_SENSOR_COUNT];
-    temp_threshold_t thresholds[TEMP_SENSOR_COUNT];
-} temp_handler_t;
-
-typedef struct fan_handler {
-    fan_pwm_setter_t    pwm_writer;
-    fan_status_getter_t status_reader;
-} fan_handler_t;
-
-/* over temp protection */
-typedef struct otp_handler {
-    ot_protector_t  otp_writer;
-} otp_handler_t;
-
-// struct thermal_policy_manager {
-//     temp_handler_t  temp_hdlr;
-//     fan_handler_t   fan_hdlr;
-//     otp_handler_t   otp_hdlr; /* over temp protector */
-// };
-
-// struct thermal_policy_manager tp_mgr = {
-//     .temp_hdlr = {
-//         .thresholds = {
-//             [TEMP_SENSOR_CPU]  = { .idle = 60000, .up_adjust = 85000, .down_adjust = 75000, .otp = 100000 },
-//             [TEMP_SENSOR_MAC]  = { .idle = 60000, .up_adjust = 90000, .down_adjust = 80000, .otp = 105000 },
-//             [TEMP_SENSOR_XCVR] = { .idle = ONLP_STATUS_E_MISSING, .up_adjust = 75000, .down_adjust = 65000 }
-//         },
-//         .temp_readers = {
-//             [TEMP_SENSOR_CPU] = onlp_sysi_get_cpu_temp,
-//             [TEMP_SENSOR_MAC] = onlp_sysi_get_mac_temp,
-//             [TEMP_SENSOR_XCVR] = onlp_sysi_get_xcvr_temp
-//         }
-//     },
-//     .fan_hdlr = {
-//         .pwm_writer = onlp_sysi_set_fan_duty_all,
-//         .status_reader = onlp_sysi_get_fan_status
-//     },
-//     .otp_hdlr = {
-//         .otp_writer = onlp_sysi_over_temp_protector
-//     }
-// };
+#define NUM_OF_CPLD_VER 4
 
 static char* cpld_ver_path[NUM_OF_CPLD_VER] = {
-    "/sys/devices/platform/as1813_128o_sys/fpga_version",  /* FPGA */
+    "/sys/devices/platform/as1813_128o_sys/fpga_version",   /* FPGA */
     "/sys/devices/platform/as1813_128o_fpga/cpld1_version", /* CPLD-1 */
     "/sys/devices/platform/as1813_128o_fpga/cpld2_version", /* CPLD-2 */
     "/sys/devices/platform/as1813_128o_fan/hwmon/hwmon*/version" /* Fan CPLD */
@@ -131,7 +55,7 @@ onlp_sysi_onie_data_get(uint8_t** data, int* size)
 {
     uint8_t* rdata = aim_zmalloc(256);
     if (onlp_file_read(rdata, 256, size, IDPROM_PATH) == ONLP_STATUS_OK) {
-        if(*size == 256) {
+        if (*size == 256) {
             *data = rdata;
             return ONLP_STATUS_OK;
         }
@@ -149,22 +73,18 @@ onlp_sysi_oids_get(onlp_oid_t* table, int max)
     onlp_oid_t* e = table;
     memset(table, 0, max*sizeof(onlp_oid_t));
 
-    /* 16 Thermal sensors on the chassis */
     for (i = 1; i <= CHASSIS_THERMAL_COUNT; i++) {
         *e++ = ONLP_THERMAL_ID_CREATE(i);
     }
 
-    /* 5 LEDs on the chassis */
     for (i = 1; i <= CHASSIS_LED_COUNT; i++) {
         *e++ = ONLP_LED_ID_CREATE(i);
     }
 
-    /* 4 PSUs on the chassis */
     for (i = 1; i <= CHASSIS_PSU_COUNT; i++) {
         *e++ = ONLP_PSU_ID_CREATE(i);
     }
 
-    /* 16 Fans on the chassis */
     for (i = 1; i <= CHASSIS_FAN_COUNT; i++) {
         *e++ = ONLP_FAN_ID_CREATE(i);
     }
@@ -218,273 +138,8 @@ onlp_sysi_platform_info_free(onlp_platform_info_t* pi)
     aim_free(pi->cpld_versions);
 }
 
-// int onlp_sysi_get_cpu_temp(int *temp)
-// {
-//     int ret;
-//     onlp_thermal_info_t ti;
-
-//     ret = onlp_thermali_info_get(ONLP_THERMAL_ID_CREATE(THERMAL_CPU_CORE), &ti);
-//     if (ret != ONLP_STATUS_OK) {
-//         return ret;
-//     }
-
-//     *temp = ti.mcelsius;
-//     return ONLP_STATUS_OK;
-// }
-
-// int onlp_sysi_get_mac_temp(int *temp)
-// {
-//     int ret;
-//     char* file = NULL;
-
-//     ret = onlp_file_find("/run/mac/", "temp1_input", &file);
-//     AIM_FREE_IF_PTR(file);
-
-//     if (ONLP_STATUS_OK != ret) {
-//         *temp = ONLP_STATUS_E_MISSING;
-//         return ONLP_STATUS_OK;
-//     }
-
-//     ret = onlp_file_read_int(temp, "/run/mac/temp1_input");
-//     if (ONLP_STATUS_OK != ret) {
-//         *temp = ONLP_STATUS_E_MISSING;
-//         return ONLP_STATUS_OK;
-//     }
-
-//     return ONLP_STATUS_OK;
-// }
-
-// int onlp_sysi_get_xcvr_presence(void)
-// {
-//     onlp_sfp_bitmap_t bitmap;
-//     onlp_sfp_bitmap_t_init(&bitmap);
-//     onlp_sfp_presence_bitmap_get(&bitmap);
-
-//     /* Ignore SFP */
-//     AIM_BITMAP_CLR(&bitmap, 65);
-//     AIM_BITMAP_CLR(&bitmap, 66);
-//     return !(AIM_BITMAP_COUNT(&bitmap) == 0);
-// }
-
-// int onlp_sysi_get_sff8436_temp(int port, int *temp)
-// {
-//     int value;
-//     int16_t port_temp;
-
-//     /* Read memory model */
-//     value = onlp_sfpi_dev_readb(port, 0x50, 0x2);
-//     if (value & 0x04) {
-//         *temp = ONLP_STATUS_E_MISSING;
-//         return ONLP_STATUS_OK;
-//     }
-
-//     value = onlp_sfpi_dev_readb(port, 0x50, 22);
-//     if (value < 0) {
-//         *temp = ONLP_STATUS_E_MISSING;
-//         return ONLP_STATUS_OK;
-//     }
-//     port_temp = (int16_t)((value & 0xFF) << 8);
-
-//     value = onlp_sfpi_dev_readb(port, 0x50, 23);
-//     if (value < 0) {
-//         *temp = ONLP_STATUS_E_MISSING;
-//         return ONLP_STATUS_OK;
-//     }
-//     port_temp = (port_temp | (int16_t)(value & 0xFF));
-
-//     *temp = (int)port_temp * 1000 / 256;
-//     return ONLP_STATUS_OK;
-// }
-
-// int onlp_sysi_get_cmis_temp(int port, int *temp)
-// {
-//     int value;
-//     int16_t port_temp;
-
-//     /* Read memory model */
-//     value = onlp_sfpi_dev_readb(port, 0x50, 0x2);
-//     if (value & 0x80) {
-//         *temp = ONLP_STATUS_E_MISSING;
-//         return ONLP_STATUS_OK;
-//     }
-
-//     value = onlp_sfpi_dev_readb(port, 0x50, 14);
-//     if (value < 0) {
-//         *temp = ONLP_STATUS_E_MISSING;
-//         return ONLP_STATUS_OK;
-//     }
-//     port_temp = (int16_t)((value & 0xFF) << 8);
-
-//     value = onlp_sfpi_dev_readb(port, 0x50, 15);
-//     if (value < 0) {
-//         *temp = ONLP_STATUS_E_MISSING;
-//         return ONLP_STATUS_OK;
-//     }
-//     port_temp = (port_temp | (int16_t)(value & 0xFF));
-
-//     *temp = (int)port_temp * 1000 / 256;
-//     return ONLP_STATUS_OK;
-// }
-
-// int onlp_sysi_get_xcvr_temp(int *temp)
-// {
-//     int ret = ONLP_STATUS_OK;
-//     int value, port;
-//     int port_temp = ONLP_STATUS_E_MISSING, max_temp = ONLP_STATUS_E_MISSING;
-
-//     *temp = ONLP_STATUS_E_MISSING;
-
-//     if (!onlp_sysi_get_xcvr_presence()) {
-//         return ONLP_STATUS_OK;
-//     }
-
-//     for (port = 1; port <= NUM_OF_QSFP_PORT; port++) {
-//         if (!onlp_sfpi_is_present(port)) {
-//             continue;
-//         }
-
-//         value = onlp_sfpi_dev_readb(port, 0x50, 0);
-//         if (value < 0) {
-//             AIM_LOG_ERROR("Unable to get read port(%d) eeprom\r\n", port);
-//             continue;
-//         }
-
-//         if (value == 0x18 || value == 0x19 || value == 0x1E) {
-//             ret = onlp_sysi_get_cmis_temp(port, &port_temp);
-//             if (ret != ONLP_STATUS_OK) {
-//                 continue;
-//             }
-//         }
-//         else if (value == 0x0C || value == 0x0D || value == 0x11 || value ==  0xE1) {
-//             ret = onlp_sysi_get_sff8436_temp(port, &port_temp);
-//             if (ret != ONLP_STATUS_OK) {
-//                 continue;
-//             }
-//         }
-//         else {
-//             continue;
-//         }
-
-//         if (port_temp > max_temp) {
-//             max_temp = port_temp;
-//         }
-//     }
-
-//     *temp = max_temp;
-//     return ONLP_STATUS_OK;
-// }
-
-// int onlp_sysi_reset_front_port(void)
-// {
-//     int port, ret;
-
-//     for (port = 1; port <= NUM_OF_QSFP_PORT; port++) {
-//         if (ONLP_STATUS_OK != onlp_sfpi_control_set(port, ONLP_SFP_CONTROL_RESET_STATE, 1)) {
-//             ret = ONLP_STATUS_E_INTERNAL;
-//         }
-//     }
-
-//     return ret;
-// }
-
-// int onlp_sysi_over_temp_protector(void)
-// {
-//     AIM_SYSLOG_CRIT("Temperature critical", "Temperature critical",
-//                     "Alarm for temperature critical is detected; performing OTP protect action!");
-//     system("sync;sync;sync");
-//     onlp_sysi_reset_front_port();
-//     onlp_file_write_int(1, "/sys/devices/platform/as1813_128o_sys/otp_protect");
-//     return ONLP_STATUS_OK;
-// }
-
-// int onlp_sysi_set_fan_duty_all(int duty)
-// {
-//     int fid, ret = ONLP_STATUS_OK;
-
-//     for (fid = 1; fid <= CHASSIS_FAN_COUNT; fid++) {
-//         if (ONLP_STATUS_OK != onlp_fani_percentage_set(ONLP_FAN_ID_CREATE(fid), duty)) {
-//             ret = ONLP_STATUS_E_INTERNAL;
-//         }
-//     }
-
-//     return ret;
-// }
-
-// int onlp_sysi_get_fan_status(void)
-// {
-//     int i, ret;
-//     onlp_fan_info_t fi[CHASSIS_FAN_COUNT];
-//     memset(fi, 0, sizeof(fi));
-
-//     for (i = 0; i < CHASSIS_FAN_COUNT; i++) {
-//         ret = onlp_fani_info_get(ONLP_FAN_ID_CREATE(i+1), &fi[i]);
-//         if (ret != ONLP_STATUS_OK) {
-// 			AIM_LOG_ERROR("Unable to get fan(%d) status\r\n", i+1);
-//             return ONLP_STATUS_E_INTERNAL;
-//         }
-
-//         if (!(fi[i].status & ONLP_FAN_STATUS_PRESENT)) {
-//             AIM_LOG_ERROR("Fan(%d) is NOT present\r\n", i+1);
-//             return ONLP_STATUS_E_INTERNAL;
-//         }
-
-//         if (fi[i].status & ONLP_FAN_STATUS_FAILED) {
-//             AIM_LOG_ERROR("Fan(%d) is NOT operational\r\n", i+1);
-//             return ONLP_STATUS_E_INTERNAL;
-//         }
-//     }
-
-//     return ONLP_STATUS_OK;
-// }
-
-int onlp_sysi_platform_manage_fans(void)
+int
+onlp_sysi_platform_manage_fans(void)
 {
-    // int i, ret;
-    // int temp[TEMP_SENSOR_COUNT] = {0};
-    // static int fan_duty = 60;
-
-    // /* Get fan status
-    //  * Bring fan speed to FAN_DUTY_MAX if any fan is not present or operational
-    //  */
-    // if (tp_mgr.fan_hdlr.status_reader() != ONLP_STATUS_OK) {
-    //     fan_duty = FAN_DUTY_MAX;
-    //     tp_mgr.fan_hdlr.pwm_writer(fan_duty);
-    //     return ONLP_STATUS_E_INTERNAL;
-    // }
-
-    // for (i = 0; i < AIM_ARRAYSIZE(temp); i++) {
-    //     ret = tp_mgr.temp_hdlr.temp_readers[i](&temp[i]);
-    //     if (ret != ONLP_STATUS_OK) {
-    //         fan_duty = FAN_DUTY_MAX;
-    //         tp_mgr.fan_hdlr.pwm_writer(fan_duty);
-    //         return ret;
-    //     }
-    // }
-
-    // /* Adjust fan pwm based on current temperature status */
-    // if (!onlp_sysi_get_xcvr_presence() &&
-    //     temp[TEMP_SENSOR_CPU] < tp_mgr.temp_hdlr.thresholds[TEMP_SENSOR_CPU].idle &&
-    //     temp[TEMP_SENSOR_MAC] < tp_mgr.temp_hdlr.thresholds[TEMP_SENSOR_MAC].idle) {
-    //     fan_duty = FAN_DUTY_MIN;
-    // }
-    // else if (temp[TEMP_SENSOR_CPU] > tp_mgr.temp_hdlr.thresholds[TEMP_SENSOR_CPU].up_adjust ||
-    //          temp[TEMP_SENSOR_MAC] > tp_mgr.temp_hdlr.thresholds[TEMP_SENSOR_MAC].up_adjust ||
-    //          temp[TEMP_SENSOR_XCVR] > tp_mgr.temp_hdlr.thresholds[TEMP_SENSOR_XCVR].up_adjust) {
-    //     fan_duty = FAN_DUTY_MAX;
-    // }
-    // else if (temp[TEMP_SENSOR_CPU] < tp_mgr.temp_hdlr.thresholds[TEMP_SENSOR_CPU].down_adjust &&
-    //          temp[TEMP_SENSOR_MAC] < tp_mgr.temp_hdlr.thresholds[TEMP_SENSOR_MAC].down_adjust &&
-    //          temp[TEMP_SENSOR_XCVR] < tp_mgr.temp_hdlr.thresholds[TEMP_SENSOR_XCVR].down_adjust) {
-    //     fan_duty = FAN_DUTY_MID;
-    // }
-
-    // tp_mgr.fan_hdlr.pwm_writer(fan_duty);
-
-    // /* Handle over temp condition */
-    // if (temp[TEMP_SENSOR_CPU] > tp_mgr.temp_hdlr.thresholds[TEMP_SENSOR_CPU].otp ||
-    //     temp[TEMP_SENSOR_MAC] > tp_mgr.temp_hdlr.thresholds[TEMP_SENSOR_MAC].otp) {
-    //     tp_mgr.otp_hdlr.otp_writer();
-    // }
-
     return ONLP_STATUS_OK;
 }

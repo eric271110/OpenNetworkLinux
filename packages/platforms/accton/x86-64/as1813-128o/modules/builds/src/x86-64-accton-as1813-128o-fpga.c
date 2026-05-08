@@ -1273,33 +1273,28 @@ static ssize_t status_write(struct device *dev, struct device_attribute *da,
     void __iomem *addr;
     int status;
     u16 reg;
-    u8 input, fpga_spi_mux_data;
+    u8 input;
     u8 reg_val, bit_mask, should_set_bit;
-    u32 spi_mask;
 
     status = kstrtou8(buf, 10, &input);
     if (status) {
         return status;
     }
 
-    spi_mask = SPI_BUSY_MASK_CPLD;
     reg = attribute_mappings[attr->index].reg;
-    fpga_spi_mux_data = attribute_mappings[attr->index].spi_mux;
     bit_mask = attribute_mappings[attr->index].mask;
     addr = fpga_ctl->pci_fpga_dev.data_base_addr0;
-
-    bit_mask = attribute_mappings[attr->index].mask;
     should_set_bit = attribute_mappings[attr->index].revert ? !input : input;
 
     LOCK(&cpld_access_lock);
-    iowrite8(fpga_spi_mux_data, spi_mux_reg);
-    reg_val = fpga_read(addr + reg, spi_mask);
+    iowrite8(attribute_mappings[attr->index].spi_mux, spi_mux_reg);
+    reg_val = fpga_read(addr + reg, SPI_BUSY_MASK_CPLD);
     if (should_set_bit) {
         reg_val |= bit_mask;
     } else {
         reg_val &= ~bit_mask;
     }
-    fpga_write(addr + reg, reg_val, spi_mask);
+    fpga_write(addr + reg, reg_val, SPI_BUSY_MASK_CPLD);
     UNLOCK(&cpld_access_lock);
 
     return count;
@@ -1546,16 +1541,9 @@ static struct ocores_i2c_platform_data as1813_128o_platform_data = {
     /*
      * PRER_L and PRER_H are calculated based on clock_khz and bus_khz
      * in i2c-ocores.c:ocores_init.
+     * SCL 100KHZ => PRER_L = 0x32, PRER_H = 0x00
      */
-#if 1
-    /* SCL 100KHZ in FPGA spec. => PRER_L = 0x32, PRER_H = 0x00 */
     .clock_khz = 25500,
-    //.bus_khz = 100,
-#else
-    /* SCL 400KHZ in FPGA spec. => PRER_L = 0x0D, PRER_H = 0x00 */
-    .clock_khz = 28000,
-    .bus_khz = 400,
-#endif
 };
 
 struct platform_device *ocore_i2c_device_add(unsigned int id, unsigned long bar_base,
@@ -1604,11 +1592,9 @@ static int as1813_128o_pcie_fpga_stat_probe(struct platform_device *pdev)
     struct device *dev = &pdev->dev;
     struct as1813_128o_fpga_data *fpga_ctl;
     struct pci_dev *pcidev;
-    struct resource *ret;
     int i;
     int status = 0, err = 0;
     unsigned long bar_base;
-    int fpga_spi_mux_data;
 
     fpga_ctl = devm_kzalloc(dev, sizeof(struct as1813_128o_fpga_data), GFP_KERNEL);
     if (!fpga_ctl) {
@@ -1634,9 +1620,6 @@ static int as1813_128o_pcie_fpga_stat_probe(struct platform_device *pdev)
     /* enable PCI bus-mastering */
     pci_set_master(pcidev);
 
-    /*
-     * Detect platform for changing the setting behavior of LP mode.
-     */
     fpga_ctl->pci_fpga_dev.data_base_addr0 = pci_iomap(pcidev, BAR0_NUM, 0);
     if (fpga_ctl->pci_fpga_dev.data_base_addr0 == NULL) {
         dev_err(dev, "Failed to map BAR0\n");
@@ -1656,11 +1639,9 @@ static int as1813_128o_pcie_fpga_stat_probe(struct platform_device *pdev)
     /*
      * Create ocore_i2c device for OSFP EEPROM
      */
+    bar_base = pci_resource_start(pcidev, BAR0_NUM);
     for (i = 0; i < PORT_NUM; i++) {
-        fpga_spi_mux_data = port[i].spi_mux;
-
-        bar_base = pci_resource_start(pcidev, BAR0_NUM);
-        iowrite8(fpga_spi_mux_data, spi_mux_reg);
+        iowrite8(port[i].spi_mux, spi_mux_reg);
 
         fpga_ctl->pci_fpga_dev.fpga_i2c[i] =
             ocore_i2c_device_add((i | (SPI_BUSY_MASK_CPLD << 8)), bar_base, port[i].offset);

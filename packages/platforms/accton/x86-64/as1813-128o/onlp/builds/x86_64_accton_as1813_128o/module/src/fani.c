@@ -239,34 +239,14 @@ onlp_fani_info_get(onlp_oid_t id, onlp_fan_info_t* info)
     fid = ONLP_OID_ID_GET(id);
     *info = finfo[fid];
 
-    switch (fid) {
-        case FAN_1_ON_FAN_BOARD:
-        case FAN_2_ON_FAN_BOARD:
-        case FAN_3_ON_FAN_BOARD:
-        case FAN_4_ON_FAN_BOARD:
-        case FAN_5_ON_FAN_BOARD:
-        case FAN_6_ON_FAN_BOARD:
-        case FAN_7_ON_FAN_BOARD:
-        case FAN_8_ON_FAN_BOARD:
-        case FAN_9_ON_FAN_BOARD:
-        case FAN_10_ON_FAN_BOARD:
-        case FAN_11_ON_FAN_BOARD:
-        case FAN_12_ON_FAN_BOARD:
-        case FAN_13_ON_FAN_BOARD:
-        case FAN_14_ON_FAN_BOARD:
-        case FAN_15_ON_FAN_BOARD:
-        case FAN_16_ON_FAN_BOARD:
-            rc = _onlp_fani_info_get_fan(fid, info);
-            break;
-        case FAN_1_ON_PSU_1:
-        case FAN_1_ON_PSU_2:
-        case FAN_1_ON_PSU_3:
-        case FAN_1_ON_PSU_4:
-            rc = _onlp_fani_info_get_fan_on_psu(fid-FAN_16_ON_FAN_BOARD, info);
-            break;
-        default:
-            rc = ONLP_STATUS_E_INVALID;
-            break;
+    if (fid >= FAN_1_ON_FAN_BOARD && fid <= FAN_16_ON_FAN_BOARD) {
+        rc = _onlp_fani_info_get_fan(fid, info);
+    }
+    else if (fid >= FAN_1_ON_PSU_1 && fid <= FAN_1_ON_PSU_4) {
+        rc = _onlp_fani_info_get_fan_on_psu(fid - FAN_16_ON_FAN_BOARD, info);
+    }
+    else {
+        rc = ONLP_STATUS_E_INVALID;
     }
 
     return rc;
