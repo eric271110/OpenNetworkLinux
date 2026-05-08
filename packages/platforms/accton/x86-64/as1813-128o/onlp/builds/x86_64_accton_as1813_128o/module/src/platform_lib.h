@@ -29,7 +29,7 @@
 #include "x86_64_accton_as1813_128o_log.h"
 
 #define CHASSIS_FAN_COUNT      16
-#define CHASSIS_THERMAL_COUNT  16
+#define CHASSIS_THERMAL_COUNT  15
 #define CHASSIS_LED_COUNT      5
 #define CHASSIS_PSU_COUNT      4
 #define NUM_OF_THERMAL_PER_PSU 3
@@ -48,7 +48,6 @@
 
 enum onlp_thermal_id {
     THERMAL_RESERVED = 0,
-    THERMAL_CPU_CORE,
     THERMAL_1_ON_MAIN_BROAD,
     THERMAL_2_ON_MAIN_BROAD,
     THERMAL_3_ON_MAIN_BROAD,
@@ -70,6 +69,12 @@ enum onlp_thermal_id {
     THERMAL_1_ON_PSU2,
     THERMAL_2_ON_PSU2,
     THERMAL_3_ON_PSU2,
+    THERMAL_1_ON_PSU3,
+    THERMAL_2_ON_PSU3,
+    THERMAL_3_ON_PSU3,
+    THERMAL_1_ON_PSU4,
+    THERMAL_2_ON_PSU4,
+    THERMAL_3_ON_PSU4,
     THERMAL_COUNT
 };
 

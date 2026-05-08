@@ -36,7 +36,6 @@
 
 static char* devfiles__[] = { /* must map with onlp_thermal_id */
     NULL,
-    NULL,                  /* CPU_CORE files */
     "/sys/devices/platform/as1813_128o_thermal*temp1_input",
     "/sys/devices/platform/as1813_128o_thermal*temp2_input",
     "/sys/devices/platform/as1813_128o_thermal*temp3_input",
@@ -66,22 +65,9 @@ static char* devfiles__[] = { /* must map with onlp_thermal_id */
     "/sys/devices/platform/as1813_128o_psu.3*psu4_temp3_input"
 };
 
-static char* cpu_coretemp_files[] = {
-    "/sys/devices/platform/coretemp.0*temp1_input",
-    "/sys/devices/platform/coretemp.0*temp2_input",
-    "/sys/devices/platform/coretemp.0*temp3_input",
-    "/sys/devices/platform/coretemp.0*temp4_input",
-    "/sys/devices/platform/coretemp.0*temp5_input",
-    NULL,
-};
-
 /* Static values */
 static onlp_thermal_info_t tinfo[] = {
     { }, /* Not used */
-    {   { ONLP_THERMAL_ID_CREATE(THERMAL_CPU_CORE), "CPU Core", 0, {0} },
-        ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
-    },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_1_ON_MAIN_BROAD), "CB_FrontRight_temp(0x48)", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
         ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
@@ -166,27 +152,27 @@ static onlp_thermal_info_t tinfo[] = {
         ONLP_THERMAL_STATUS_PRESENT,
         ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
     },
-    {   { ONLP_THERMAL_ID_CREATE(THERMAL_1_ON_PSU2), "PSU-3 Thermal Sensor 1", ONLP_PSU_ID_CREATE(PSU3_ID), {0} },
+    {   { ONLP_THERMAL_ID_CREATE(THERMAL_1_ON_PSU3), "PSU-3 Thermal Sensor 1", ONLP_PSU_ID_CREATE(PSU3_ID), {0} },
         ONLP_THERMAL_STATUS_PRESENT,
         ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
     },
-    {   { ONLP_THERMAL_ID_CREATE(THERMAL_2_ON_PSU2), "PSU-3 Thermal Sensor 2", ONLP_PSU_ID_CREATE(PSU3_ID), {0} },
+    {   { ONLP_THERMAL_ID_CREATE(THERMAL_2_ON_PSU3), "PSU-3 Thermal Sensor 2", ONLP_PSU_ID_CREATE(PSU3_ID), {0} },
         ONLP_THERMAL_STATUS_PRESENT,
         ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
     },
-    {   { ONLP_THERMAL_ID_CREATE(THERMAL_3_ON_PSU2), "PSU-3 Thermal Sensor 3", ONLP_PSU_ID_CREATE(PSU3_ID), {0} },
+    {   { ONLP_THERMAL_ID_CREATE(THERMAL_3_ON_PSU3), "PSU-3 Thermal Sensor 3", ONLP_PSU_ID_CREATE(PSU3_ID), {0} },
         ONLP_THERMAL_STATUS_PRESENT,
         ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
     },
-    {   { ONLP_THERMAL_ID_CREATE(THERMAL_1_ON_PSU2), "PSU-4 Thermal Sensor 1", ONLP_PSU_ID_CREATE(PSU4_ID), {0} },
+    {   { ONLP_THERMAL_ID_CREATE(THERMAL_1_ON_PSU4), "PSU-4 Thermal Sensor 1", ONLP_PSU_ID_CREATE(PSU4_ID), {0} },
         ONLP_THERMAL_STATUS_PRESENT,
         ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
     },
-    {   { ONLP_THERMAL_ID_CREATE(THERMAL_2_ON_PSU2), "PSU-4 Thermal Sensor 2", ONLP_PSU_ID_CREATE(PSU4_ID), {0} },
+    {   { ONLP_THERMAL_ID_CREATE(THERMAL_2_ON_PSU4), "PSU-4 Thermal Sensor 2", ONLP_PSU_ID_CREATE(PSU4_ID), {0} },
         ONLP_THERMAL_STATUS_PRESENT,
         ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
     },
-    {   { ONLP_THERMAL_ID_CREATE(THERMAL_3_ON_PSU2), "PSU-4 Thermal Sensor 3", ONLP_PSU_ID_CREATE(PSU4_ID), {0} },
+    {   { ONLP_THERMAL_ID_CREATE(THERMAL_3_ON_PSU4), "PSU-4 Thermal Sensor 3", ONLP_PSU_ID_CREATE(PSU4_ID), {0} },
         ONLP_THERMAL_STATUS_PRESENT,
         ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
     }
@@ -219,10 +205,6 @@ onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 
     tid = ONLP_OID_ID_GET(id);
     *info = tinfo[tid];
-
-    if (tid == THERMAL_CPU_CORE) {
-        return onlp_file_read_int_max(&info->mcelsius, cpu_coretemp_files);
-    }
 
     return onlp_file_read_int(&info->mcelsius, devfiles__[tid]);
 }
