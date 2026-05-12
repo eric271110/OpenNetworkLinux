@@ -31,47 +31,27 @@
 #include <linux/ipmi_smi.h>
 #include <linux/platform_device.h>
 #include <linux/string_helpers.h>
+#include "as1813-128o-ipmi.h"
 
 #define DRVNAME "as1813_128o_sys"
-#define ACCTON_IPMI_NETFN 0x34
 
-#define IPMI_TIMEOUT (5 * HZ)
-#define IPMI_ERR_RETRY_TIMES 1
 #define IPMI_SYSEEPROM_READ_CMD 0x18
 #define IPMI_READ_MAX_LEN       128
 
 #define EEPROM_NAME             "eeprom"
 #define EEPROM_SIZE             256 /*  256 byte eeprom */
 
-#define IPMI_CPLD_READ_CMD             0x20
-#define IPMI_CPLD_COM_E_CMD            0x21
-#define IPMI_CPLD_1U_FAN_CMD           0x34
-#define IPMI_CPLD_2U_FAN_CMD           0x33
-#define IPMI_CPLD_FPGA_CMD             0x61
-#define IPMI_CPLD_MB_CPLD0_CMD         0x62
-#define IPMI_CPLD_MB_CPLD1_CMD         0x63
+#define IPMI_CPLD_READ_CMD             0x20 //need to check
+#define IPMI_CPLD_COM_E_CMD            0x21 //need to check
+#define IPMI_CPLD_1U_FAN_CMD           0x34 //need to check
+#define IPMI_CPLD_2U_FAN_CMD           0x33 //need to check
+#define IPMI_CPLD_FPGA_CMD             0x61 //need to check
+#define IPMI_CPLD_MB_CPLD0_CMD         0x62 //need to check
+#define IPMI_CPLD_MB_CPLD1_CMD         0x63 //need to check
 
-static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data);
 static int as1813_128o_sys_probe(struct platform_device *pdev);
 static int as1813_128o_sys_remove(struct platform_device *pdev);
 static ssize_t show_cpld_version(struct device *dev, struct device_attribute *da, char *buf);
-
-struct ipmi_data {
-    struct completion read_complete;
-    struct ipmi_addr address;
-    struct ipmi_user * user;
-    int interface;
-
-    struct kernel_ipmi_msg tx_message;
-    long tx_msgid;
-
-    void *rx_msg_data;
-    unsigned short rx_msg_len;
-    unsigned char rx_result;
-    int rx_recv_type;
-
-    struct ipmi_user_hndl ipmi_hndlrs;
-};
 
 struct as1813_128o_sys_data {
     struct platform_device *pdev;
@@ -126,161 +106,6 @@ static const struct attribute_group as1813_128o_sys_group = {
     .attrs = as1813_128o_sys_attributes,
 };
 
-/* Functions to talk to the IPMI layer */
-/* Initialize IPMI address, message buffers and user data */
-static int init_ipmi_data(struct ipmi_data *ipmi, int iface,
-                  struct device *dev)
-{
-    int err;
-
-    init_completion(&ipmi->read_complete);
-
-    /* Initialize IPMI address */
-    ipmi->address.addr_type = IPMI_SYSTEM_INTERFACE_ADDR_TYPE;
-    ipmi->address.channel = IPMI_BMC_CHANNEL;
-    ipmi->address.data[0] = 0;
-    ipmi->interface = iface;
-
-    /* Initialize message buffers */
-    ipmi->tx_msgid = 0;
-    ipmi->tx_message.netfn = ACCTON_IPMI_NETFN;
-
-    ipmi->ipmi_hndlrs.ipmi_recv_hndl = ipmi_msg_handler;
-
-    /* Create IPMI messaging interface user */
-    err = ipmi_create_user(ipmi->interface, &ipmi->ipmi_hndlrs,
-                        ipmi, &ipmi->user);
-    if (err < 0) {
-        dev_err(dev, "Unable to register user with IPMI "
-            "interface %d\n", ipmi->interface);
-        return -EACCES;
-    }
-
-    return 0;
-}
-
-/* Send an IPMI command */
-static int _ipmi_send_message(struct ipmi_data *ipmi, unsigned char cmd,
-                            unsigned char *tx_data, unsigned short tx_len,
-                            unsigned char *rx_data, unsigned short rx_len)
-{
-    int err;
-
-    ipmi->tx_message.cmd = cmd;
-    ipmi->tx_message.data = tx_data;
-    ipmi->tx_message.data_len = tx_len;
-    ipmi->rx_msg_data = rx_data;
-    ipmi->rx_msg_len = rx_len;
-
-    err = ipmi_validate_addr(&ipmi->address, sizeof(ipmi->address));
-    if (err)
-        goto addr_err;
-
-    ipmi->tx_msgid++;
-    err = ipmi_request_settime(ipmi->user, &ipmi->address, ipmi->tx_msgid,
-                &ipmi->tx_message, ipmi, 0, 0, 0);
-    if (err)
-        goto ipmi_req_err;
-
-    err = wait_for_completion_timeout(&ipmi->read_complete, IPMI_TIMEOUT);
-    if (!err)
-        goto ipmi_timeout_err;
-
-    return 0;
-
-ipmi_timeout_err:
-    err = -ETIMEDOUT;
-    dev_err(&data->pdev->dev, "request_timeout=%x\n", err);
-    return err;
-ipmi_req_err:
-    dev_err(&data->pdev->dev, "request_settime=%x\n", err);
-    return err;
-addr_err:
-    dev_err(&data->pdev->dev, "validate_addr=%x\n", err);
-    return err;
-}
-
-/* Send an IPMI command with retry */
-static int ipmi_send_message(struct ipmi_data *ipmi, unsigned char cmd,
-                            unsigned char *tx_data, unsigned short tx_len,
-                            unsigned char *rx_data, unsigned short rx_len)
-{
-    int status = 0, retry = 0;
-
-    char *cmdline = kstrdup_quotable_cmdline(current, GFP_KERNEL);
-
-    int i = 0;
-    char raw_cmd[20] = "";
-    sprintf(raw_cmd, "0x%02x", cmd);
-    if(tx_len) {
-        for(i = 0; i < tx_len; i++)
-            sprintf(raw_cmd + strlen(raw_cmd), " 0x%02x", tx_data[i]);
-    }
-
-    for (retry = 0; retry <= IPMI_ERR_RETRY_TIMES; retry++) {
-        status = _ipmi_send_message(ipmi,cmd, tx_data, tx_len, rx_data, 
-                 rx_len);
-        if (unlikely(status != 0)) {
-            dev_err(&data->pdev->dev,
-                    "ipmi_send_message_%d err status(%d)[%s] raw_cmd=[%s] tx_msgid=(%02x)\r\n",
-                    retry, status, cmdline ? cmdline : "", raw_cmd, 
-                    (int)ipmi->tx_msgid);
-            continue;
-        }
-
-        if (unlikely(ipmi->rx_result != 0)) {
-            dev_err(&data->pdev->dev,
-                    "ipmi_send_message_%d err rx_result(%d)[%s] raw_cmd=[%s] tx_msgid=(%02x)\r\n",
-                    retry, ipmi->rx_result, cmdline ? cmdline : "", raw_cmd, 
-                    (int)ipmi->tx_msgid);
-            continue;
-        }
-
-        break;
-    }
-
-    if (cmdline) 
-        kfree(cmdline);
-
-    return status;
-}
-
-/* Dispatch IPMI messages to callers */
-static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data)
-{
-    unsigned short rx_len;
-    struct ipmi_data *ipmi = user_msg_data;
-
-    if (msg->msgid != ipmi->tx_msgid) {
-        dev_err(&data->pdev->dev, "Mismatch between received msgid "
-            "(%02x) and transmitted msgid (%02x)!\n",
-            (int)msg->msgid,
-            (int)ipmi->tx_msgid);
-        ipmi_free_recv_msg(msg);
-        return;
-    }
-
-    ipmi->rx_recv_type = msg->recv_type;
-    if (msg->msg.data_len > 0)
-        ipmi->rx_result = msg->msg.data[0];
-    else
-        ipmi->rx_result = IPMI_UNKNOWN_ERR_COMPLETION_CODE;
-
-    if (msg->msg.data_len > 1) {
-        rx_len = msg->msg.data_len - 1;
-        if (ipmi->rx_msg_len < rx_len)
-            rx_len = ipmi->rx_msg_len;
-        ipmi->rx_msg_len = rx_len;
-        memcpy(ipmi->rx_msg_data, msg->msg.data + 1, ipmi->rx_msg_len);
-    }
-    else {
-        ipmi->rx_msg_len = 0;
-    }
-
-    ipmi_free_recv_msg(msg);
-    complete(&ipmi->read_complete);
-}
-
 static ssize_t sys_eeprom_read(loff_t off, char *buf, size_t count)
 {
     int status = 0;
@@ -293,7 +118,7 @@ static ssize_t sys_eeprom_read(loff_t off, char *buf, size_t count)
     length = (count >= IPMI_READ_MAX_LEN) ? IPMI_READ_MAX_LEN : count;
     data->ipmi_tx_data[0] = (off & 0xff);
     data->ipmi_tx_data[1] = length;
-    status = ipmi_send_message(&data->ipmi, IPMI_SYSEEPROM_READ_CMD,
+    status = ipmi_send_message(&data->ipmi, &data->pdev->dev, IPMI_SYSEEPROM_READ_CMD,
                                 data->ipmi_tx_data, sizeof(data->ipmi_tx_data),
                                 data->ipmi_resp_eeprom + off, length);
     if (unlikely(status != 0)) {
@@ -375,7 +200,7 @@ static struct as1813_128o_sys_data *as1813_128o_sys_update_cpld_ver(unsigned cha
 
     data->valid = 0;
     data->ipmi_tx_data[0] = cpld_addr;
-    status = ipmi_send_message(&data->ipmi, IPMI_CPLD_READ_CMD,
+    status = ipmi_send_message(&data->ipmi, &data->pdev->dev, IPMI_CPLD_READ_CMD,
                                 data->ipmi_tx_data, 1,
                                 data->ipmi_resp_cpld,
                                 sizeof(data->ipmi_resp_cpld));

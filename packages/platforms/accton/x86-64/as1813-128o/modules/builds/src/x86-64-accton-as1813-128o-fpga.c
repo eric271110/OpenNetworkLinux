@@ -1644,7 +1644,7 @@ static int as1813_128o_pcie_fpga_stat_probe(struct platform_device *pdev)
         iowrite8(port[i].spi_mux, spi_mux_reg);
 
         fpga_ctl->pci_fpga_dev.fpga_i2c[i] =
-            ocore_i2c_device_add((i | (SPI_BUSY_MASK_CPLD << 8)), bar_base, port[i].offset);
+            ocore_i2c_device_add(i, bar_base, port[i].offset);
         if (IS_ERR(fpga_ctl->pci_fpga_dev.fpga_i2c[i])) {
             status = PTR_ERR(fpga_ctl->pci_fpga_dev.fpga_i2c[i]);
             dev_err(dev, "rc:%d, unload Port%u[0x%ux] device\n",

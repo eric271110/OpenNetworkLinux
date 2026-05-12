@@ -25,7 +25,36 @@
  ***********************************************************/
 #include <onlp/onlp.h>
 #include <onlplib/file.h>
+#include <stdarg.h>
 #include "platform_lib.h"
+
+#define MAX_HWMON_IDX 20
+
+static int
+find_hwmon_idx(const char* base_fmt, ...)
+{
+    char* file = NULL;
+    char path[128];
+    va_list ap;
+    char base[96];
+    int hwmon_idx;
+
+    va_start(ap, base_fmt);
+    vsnprintf(base, sizeof(base), base_fmt, ap);
+    va_end(ap);
+
+    for (hwmon_idx = 0; hwmon_idx <= MAX_HWMON_IDX; hwmon_idx++) {
+        snprintf(path, sizeof(path), "%s/hwmon/hwmon%d/", base, hwmon_idx);
+
+        int ret = onlp_file_find(path, "name", &file);
+        AIM_FREE_IF_PTR(file);
+
+        if (ONLP_STATUS_OK == ret)
+            return hwmon_idx;
+    }
+
+    return -1;
+}
 
 enum onlp_fan_dir onlp_get_fan_dir(int fid)
 {
@@ -39,11 +68,9 @@ enum onlp_fan_dir onlp_get_fan_dir(int fid)
 
     hwmon_idx = onlp_get_fan_hwmon_idx();
     if (hwmon_idx >= 0) {
-        /* Read attribute */
         snprintf(file, sizeof(file), "fan%d_dir", fid);
         len = onlp_file_read_str(&str, FAN_SYSFS_FORMAT_1, hwmon_idx, file);
 
-        /* Verify Fan dir string length */
         if (!str || len < 3) {
             AIM_FREE_IF_PTR(str);
             return dir;
@@ -64,40 +91,10 @@ enum onlp_fan_dir onlp_get_fan_dir(int fid)
 
 int onlp_get_psu_hwmon_idx(int pid)
 {
-    /* find hwmon index */
-    char* file = NULL;
-    char path[64];
-    int ret, hwmon_idx, max_hwmon_idx = 20;
-
-    for (hwmon_idx = 0; hwmon_idx <= max_hwmon_idx; hwmon_idx++) {
-        snprintf(path, sizeof(path), "/sys/devices/platform/as1813_128o_psu.%d/hwmon/hwmon%d/", pid-1, hwmon_idx);
-
-        ret = onlp_file_find(path, "name", &file);
-        AIM_FREE_IF_PTR(file);
-
-        if (ONLP_STATUS_OK == ret)
-            return hwmon_idx;
-    }
-
-    return -1;
+    return find_hwmon_idx("/sys/devices/platform/as1813_128o_psu.%d", pid - 1);
 }
 
 int onlp_get_fan_hwmon_idx(void)
 {
-    /* find hwmon index */
-    char* file = NULL;
-    char path[64];
-    int ret, hwmon_idx, max_hwmon_idx = 20;
-
-    for (hwmon_idx = 0; hwmon_idx <= max_hwmon_idx; hwmon_idx++) {
-        snprintf(path, sizeof(path), "/sys/devices/platform/as1813_128o_fan/hwmon/hwmon%d/", hwmon_idx);
-
-        ret = onlp_file_find(path, "name", &file);
-        AIM_FREE_IF_PTR(file);
-
-        if (ONLP_STATUS_OK == ret)
-            return hwmon_idx;
-    }
-
-    return -1;
+    return find_hwmon_idx("/sys/devices/platform/as1813_128o_fan");
 }
