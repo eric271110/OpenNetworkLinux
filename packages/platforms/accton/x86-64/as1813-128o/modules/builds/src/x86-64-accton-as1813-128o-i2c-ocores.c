@@ -99,7 +99,7 @@ static unsigned int timeout = 1;
 module_param(timeout, uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(timeout, "Timeout for ocores_poll_wait, in milliseconds");
 
-static unsigned int debug = 1;
+static unsigned int debug = 0;
 module_param(debug, uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(debug, "Enable or disable debug message. 1 -> enable, 0 -> disable");
 
